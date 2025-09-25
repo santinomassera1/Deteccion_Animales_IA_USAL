@@ -1,0 +1,13 @@
+train: ../train/images
+val: ../valid/images
+test: ../test/images
+
+nc: 5
+names: ['cat', 'chicken', 'cow', 'dog', 'horse']
+
+roboflow:
+  workspace: object-detection-kefbo
+  project: animals-nhm7s
+  version: 3
+  license: CC BY 4.0
+  url: https://universe.roboflow.com/object-detection-kefbo/animals-nhm7s/dataset/3

@@ -1,0 +1,8 @@
+.venv/
+__pycache__/
+*.pyc
+runs/
+output_video.mp4
+*.pt
+*.cache
+.DS_Store
