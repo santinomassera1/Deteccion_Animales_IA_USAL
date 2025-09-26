@@ -9,6 +9,7 @@ import numpy as np
 import time
 import json
 import threading
+from collections import deque
 import traceback
 from flask import Flask, request, jsonify, render_template, send_from_directory, Response
 from flask_cors import CORS
@@ -55,7 +56,7 @@ def save_video_status():
         with open(STATUS_FILE, 'w') as f:
             json.dump(video_processing_status, f, indent=2)
     except Exception as e:
-        print(f"⚠️ Error guardando estado: {e}")
+        print(f"Error guardando estado: {e}")
 
 def load_video_status():
     """Cargar el estado de procesamiento desde archivo"""
@@ -66,7 +67,7 @@ def load_video_status():
                 video_processing_status = json.load(f)
             print(f"📂 Estado de video cargado: {len(video_processing_status)} videos")
     except Exception as e:
-        print(f"⚠️ Error cargando estado: {e}")
+        print(f"Error cargando estado: {e}")
         video_processing_status = {}
 
 def load_models():
@@ -74,7 +75,7 @@ def load_models():
     global models, model_loaded, person_detector, enhanced_handler
     
     try:
-        print("🚀 Cargando sistema mejorado con Ensemble TTA...")
+        print("Cargando sistema mejorado con Ensemble TTA...")
         
         # Cargar handler mejorado
         enhanced_handler = EnhancedModelHandler()
@@ -88,13 +89,13 @@ def load_models():
             if enhanced_handler.models:
                 primary_model = list(enhanced_handler.models.values())[0]
                 person_detector = PersonDetector(nacho_model=primary_model)
-                print("✅ Detector de personas cargado con modelo principal")
+                print("Detector de personas cargado con modelo principal")
             
-            print("🎯 Sistema mejorado cargado exitosamente!")
-            print("   🚀 Ensemble TTA - Máxima precisión con múltiples modelos")
-            print("   🔥 Test Time Augmentation - Múltiples vistas por imagen")
+            print("Sistema mejorado cargado exitosamente!")
+            print("   Ensemble TTA - Máxima precisión con múltiples modelos")
+            print("   Test Time Augmentation - Múltiples vistas por imagen")
             print("   🧠 Weighted Ensemble - Combinación inteligente de predicciones")
-            print("   🎯 Post-procesamiento avanzado - Filtros específicos por clase")
+            print("   Post-procesamiento avanzado - Filtros específicos por clase")
             print("   - Gatos: Ultra alta precisión con ensemble")
             print("   - Gallinas: Ultra alta precisión con ensemble") 
             print("   - Vacas: Ultra alta precisión con ensemble")
@@ -102,7 +103,7 @@ def load_models():
             print("   - Caballos: Ultra alta precisión con ensemble")
             print("   - Personas: Detectadas para evitar falsos positivos")
             
-            print("🎯 Sistema de tracking YOLO nativo activado - Elimina flickering profesional")
+            print("Sistema de tracking YOLO nativo activado - Elimina flickering profesional")
             print("   - ByteTrack integrado en cada modelo")
             print("   - Tracking IDs persistentes entre frames")
             print("   - Eliminación automática de parpadeo")
@@ -113,8 +114,8 @@ def load_models():
             raise Exception("No se pudieron cargar los modelos del ensemble")
             
     except Exception as e:
-        print(f"❌ Error cargando sistema mejorado: {e}")
-        print("🔄 Intentando fallback al sistema anterior...")
+        print(f"Error cargando sistema mejorado: {e}")
+        print("Intentando fallback al sistema anterior...")
         
         # Fallback al sistema anterior
         try:
@@ -130,10 +131,10 @@ def load_models():
             models['cuda_model'] = YOLO('Entrenamiento vet con cuda/runs/animals_training_m/weights/best.pt')
             person_detector = PersonDetector(nacho_model=models['cuda_model'])
             model_loaded = True
-            print("✅ Sistema fallback cargado (modelo único)")
+            print("Sistema fallback cargado (modelo único)")
             
         except Exception as fallback_error:
-            print(f"❌ Error también en fallback: {fallback_error}")
+            print(f"Error también en fallback: {fallback_error}")
             model_loaded = False
 
 def preprocess_image_for_detection(image):
@@ -223,11 +224,11 @@ def ensemble_predict(image, confidence_threshold):
     try:
         # Usar sistema mejorado si está disponible
         if enhanced_handler and model_loaded:
-            print(f"🚀 Usando sistema Ensemble TTA + YOLO Tracking (threshold: {confidence_threshold})")
+            print(f"Usando sistema Ensemble TTA + YOLO Tracking (threshold: {confidence_threshold})")
             detections = enhanced_handler.predict_with_tta(image, confidence_threshold)
             
             if detections:
-                print(f"🎯 Ensemble TTA + Tracking completado: {len(detections)} detecciones")
+                print(f"Ensemble TTA + Tracking completado: {len(detections)} detecciones")
                 
                 for i, det in enumerate(detections):
                     track_info = ""
@@ -240,22 +241,22 @@ def ensemble_predict(image, confidence_threshold):
                 
                 return detections
             else:
-                print("⚠️ Ensemble TTA + Tracking no encontró detecciones")
+                print("Ensemble TTA + Tracking no encontró detecciones")
                 return []
         
         # Fallback al sistema anterior si no hay enhanced_handler
         elif 'cuda_model' in models:
-            print(f"🔄 Usando sistema fallback (threshold: {confidence_threshold})")
+            print(f"Usando sistema fallback (threshold: {confidence_threshold})")
             return _legacy_predict(image, confidence_threshold)
         else:
-            print("❌ No hay modelos disponibles")
+            print("No hay modelos disponibles")
             return []
             
     except Exception as e:
-        print(f"❌ Error en ensemble_predict: {e}")
+        print(f"Error en ensemble_predict: {e}")
         # Intentar fallback
         if 'cuda_model' in models:
-            print("🔄 Intentando fallback después de error...")
+            print("Intentando fallback después de error...")
             return _legacy_predict(image, confidence_threshold)
         return []
 
@@ -299,11 +300,11 @@ def _legacy_predict(image, confidence_threshold):
         # Filtrado básico
         final_detections = combine_detections(all_detections, confidence_threshold)
         
-        print(f"🔍 Predicción legacy completada: {len(final_detections)} detecciones")
+        print(f"Predicción legacy completada: {len(final_detections)} detecciones")
         return final_detections
         
     except Exception as e:
-        print(f"❌ Error en predicción legacy: {e}")
+        print(f"Error en predicción legacy: {e}")
         return []
 
 def correct_class_confusion(detection):
@@ -322,7 +323,7 @@ def correct_class_confusion(detection):
         if area > 20000:
             detection['class_name'] = 'dog'
             detection['confidence'] = confidence * 0.9  # Reducir confianza por corrección
-            print(f"🔄 Corrección conservadora: cat -> dog (área muy grande: {area})")
+            print(f"Corrección conservadora: cat -> dog (área muy grande: {area})")
     
     elif class_name == 'dog' and confidence < 0.6:
         # Solo cambiar si es MUY pequeño (área < 3000 píxeles)
@@ -330,7 +331,7 @@ def correct_class_confusion(detection):
         if area < 3000:
             detection['class_name'] = 'cat'
             detection['confidence'] = confidence * 0.9
-            print(f"🔄 Corrección conservadora: dog -> cat (área muy pequeña: {area})")
+            print(f"Corrección conservadora: dog -> cat (área muy pequeña: {area})")
     
     return detection
 
@@ -599,7 +600,7 @@ def video_status(filename):
             'error': status.get('error')
         })
     except Exception as e:
-        print(f"❌ Error getting video status: {e}")
+        print(f"Error getting video status: {e}")
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/upload', methods=['POST'])
@@ -792,7 +793,7 @@ def process_video():
         
         def process_video_background():
             try:
-                print(f"🎬 Procesando video en segundo plano: {filename}")
+                print(f"Procesando video en segundo plano: {filename}")
                 print(f"📁 Archivo temporal: {filepath}")
                 print(f"📂 Directorio de salida: {output_path}")
                 
@@ -820,21 +821,21 @@ def process_video():
                 fourcc = cv2.VideoWriter_fourcc(*'H264')
                 out = cv2.VideoWriter(output_filepath, fourcc, fps, (target_width, target_height))
                 
-                print(f"🎥 Configurando video de salida: {output_filepath}")
-                print(f"📊 Parámetros: {target_width}x{target_height}, {fps} FPS, {total_frames} frames")
-                print(f"⚡ Procesamiento ULTRA optimizado: resolución reducida como webcam")
+                print(f"Configurando video de salida: {output_filepath}")
+                print(f"Parámetros: {target_width}x{target_height}, {fps} FPS, {total_frames} frames")
+                print(f"Procesamiento ULTRA optimizado: resolución reducida como webcam")
                 
                 frame_count = 0
                 # Configuración de velocidad vs calidad - MÁS AGRESIVA
                 if total_frames > 500:  # Videos medianos o largos
                     skip_frames = 5  # Procesar cada 5 frames (más rápido)
-                    print("⚡ Modo ULTRA rápido activado para video largo")
+                    print("Modo ULTRA rápido activado para video largo")
                 elif total_frames > 200:  # Videos medianos
                     skip_frames = 3  # Procesar cada 3 frames
-                    print("⚡ Modo rápido activado para video mediano")
+                    print("Modo rápido activado para video mediano")
                 else:
                     skip_frames = 2  # Procesar cada 2 frames para videos cortos
-                    print("⚡ Modo estándar activado para video corto")
+                    print("Modo estándar activado para video corto")
                 
                 while cap.isOpened():
                     ret, frame = cap.read()
@@ -876,7 +877,7 @@ def process_video():
                     if frame_count % 20 == 0:
                         progress_percent = (frame_count / total_frames) * 100
                         save_video_status()  # Guardar estado más frecuentemente
-                        print(f"📊 Progreso: {progress_percent:.1f}% ({frame_count}/{total_frames} frames)")
+                        print(f"Progreso: {progress_percent:.1f}% ({frame_count}/{total_frames} frames)")
                     
                     # Escribir frame procesado
                     out.write(frame)
@@ -889,9 +890,9 @@ def process_video():
                 # Verificar que el archivo se creó correctamente
                 if os.path.exists(output_filepath):
                     file_size = os.path.getsize(output_filepath)
-                    print(f"✅ Video procesado exitosamente: {output_filename}")
+                    print(f"Video procesado exitosamente: {output_filename}")
                     print(f"📁 Ubicación: {output_filepath}")
-                    print(f"📊 Tamaño: {file_size / (1024*1024):.2f} MB")
+                    print(f"Tamaño: {file_size / (1024*1024):.2f} MB")
                     
                     # Verificar que el video se puede leer correctamente
                     test_cap = cv2.VideoCapture(output_filepath)
@@ -899,30 +900,30 @@ def process_video():
                         ret, test_frame = test_cap.read()
                         test_cap.release()
                         if ret and test_frame is not None:
-                            print(f"✅ Video verificado: Se puede leer correctamente")
+                            print(f"Video verificado: Se puede leer correctamente")
                         else:
-                            print(f"⚠️ Advertencia: Video creado pero no se puede leer")
+                            print(f"Advertencia: Video creado pero no se puede leer")
                     else:
-                        print(f"⚠️ Advertencia: Video creado pero no se puede abrir")
+                        print(f"Advertencia: Video creado pero no se puede abrir")
                 else:
-                    print(f"❌ Error: El archivo de salida no se creó: {output_filepath}")
+                    print(f"Error: El archivo de salida no se creó: {output_filepath}")
                 
                 # Limpiar archivo temporal
                 if os.path.exists(filepath):
                     os.remove(filepath)
                     print(f"🧹 Archivo temporal eliminado: {filepath}")
                 else:
-                    print(f"⚠️ Archivo temporal ya no existe: {filepath}")
+                    print(f"Archivo temporal ya no existe: {filepath}")
                 
                 # Marcar como completado
                 if filename in video_processing_status:
                     video_processing_status[filename]['status'] = 'completed'
                     video_processing_status[filename]['output_video_url'] = f"/video/{output_filename}"
                     save_video_status()  # Persistir estado final
-                    print(f"✅ Procesamiento completado para: {filename}")
+                    print(f"Procesamiento completado para: {filename}")
                 
             except Exception as e:
-                print(f"❌ Error procesando video en segundo plano: {e}")
+                print(f"Error procesando video en segundo plano: {e}")
                 import traceback
                 traceback.print_exc()
                 
@@ -932,7 +933,7 @@ def process_video():
                         os.remove(filepath)
                         print(f"🧹 Archivo temporal eliminado después de error: {filepath}")
                 except Exception as cleanup_error:
-                    print(f"⚠️ Error limpiando archivo temporal: {cleanup_error}")
+                    print(f"Error limpiando archivo temporal: {cleanup_error}")
                 
                 # Marcar como fallido en caso de error
                 if filename in video_processing_status:
@@ -959,7 +960,7 @@ def process_video():
         })
         
     except Exception as e:
-        print(f"❌ Error en process_video: {e}")
+        print(f"Error en process_video: {e}")
         import traceback
         traceback.print_exc()
         
@@ -969,7 +970,7 @@ def process_video():
                 os.remove(filepath)
                 print(f"🧹 Archivo temporal eliminado después de error en endpoint: {filepath}")
         except Exception as cleanup_error:
-            print(f"⚠️ Error limpiando archivo en endpoint: {cleanup_error}")
+            print(f"Error limpiando archivo en endpoint: {cleanup_error}")
             
         return jsonify({'error': str(e)}), 500
 
@@ -996,11 +997,11 @@ def download_file(filename):
             print(f"📁 Archivo encontrado en: runs/detect/{filename}")
             return send_from_directory('runs/detect', filename)
         
-        print(f"❌ Archivo no encontrado: {filename}")
+        print(f"Archivo no encontrado: {filename}")
         return jsonify({'error': 'File not found'}), 404
         
     except Exception as e:
-        print(f"❌ Error descargando archivo {filename}: {e}")
+        print(f"Error descargando archivo {filename}: {e}")
         return jsonify({'error': str(e)}), 500
 
 @app.route('/video/<filename>')
@@ -1010,20 +1011,20 @@ def serve_video(filename):
         # Buscar en runs/detect y sus subdirectorios
         for root, dirs, files in os.walk('runs/detect'):
             if filename in files:
-                print(f"🎬 Video encontrado en: {root}/{filename}")
+                print(f"Video encontrado en: {root}/{filename}")
                 return send_from_directory(root, filename)
         
         # Si no se encuentra, buscar en el directorio raíz de runs/detect
         detect_path = os.path.join('runs/detect', filename)
         if os.path.exists(detect_path):
-            print(f"🎬 Video encontrado en: runs/detect/{filename}")
+            print(f"Video encontrado en: runs/detect/{filename}")
             return send_from_directory('runs/detect', filename)
         
-        print(f"❌ Video no encontrado: {filename}")
+        print(f"Video no encontrado: {filename}")
         return jsonify({'error': 'Video not found'}), 404
         
     except Exception as e:
-        print(f"❌ Error sirviendo video {filename}: {e}")
+        print(f"Error sirviendo video {filename}: {e}")
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/webcam', methods=['GET'])
@@ -1039,11 +1040,13 @@ def webcam_stream():
         # Inicializar almacén de detecciones para suavizado
         webcam_stream.last_detections = []
         
-        # Configurar webcam para mejor rendimiento y menos flickering
-        cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
-        cap.set(cv2.CAP_PROP_FPS, 15)  # Reducir FPS para más estabilidad
-        cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)  # Buffer mínimo para menos delay
+        # Configurar webcam para MÁXIMO rendimiento y fluidez
+        cap.set(cv2.CAP_PROP_FRAME_WIDTH, 320)   # Resolución más baja = más FPS
+        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 240)  # Resolución más baja = más FPS
+        cap.set(cv2.CAP_PROP_FPS, 30)            # Captura rápida, procesamos menos
+        cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)      # Sin buffer para latencia mínima
+        cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*'MJPG'))  # MJPEG para velocidad
+        cap.set(cv2.CAP_PROP_AUTO_EXPOSURE, 0.25)  # Reducir auto-exposición para velocidad
         
         try:
             frame_count = 0
@@ -1054,13 +1057,13 @@ def webcam_stream():
                 
                 frame_count += 1
                 
-                # Reducir tamaño del frame para mejor rendimiento
-                frame = cv2.resize(frame, (640, 480))
+                # Redimensionar para velocidad óptima (balance calidad/rendimiento)
+                frame = cv2.resize(frame, (480, 360))
                 
-                # Solo procesar cada 2 frames para reducir carga y mejorar estabilidad
-                if frame_count % 2 == 0:
-                    # Predicción del ensemble en tiempo real con tracking
-                    detections = ensemble_predict(frame, app.config['CONFIDENCE_THRESHOLD'])
+                # Procesar cada 4 frames para MÁXIMO rendimiento (7.5 FPS de IA, 30 FPS de video)
+                if frame_count % 4 == 0:
+                    # Predicción optimizada para tiempo real (threshold más alto = más velocidad)
+                    detections = ensemble_predict(frame, 0.4)
                     
                     # Aplicar filtrado temporal para eliminar falsos positivos
                     detections = apply_temporal_filter(detections, frame_count)
@@ -1121,11 +1124,11 @@ def webcam_stream():
                 if detections:
                     webcam_stream.last_detections = detections
                 
-                # Codificar frame con configuración optimizada para menos flickering
+                # Codificación JPEG ultra-optimizada para VELOCIDAD
                 encode_params = [
-                    cv2.IMWRITE_JPEG_QUALITY, 90,  # Mayor calidad
-                    cv2.IMWRITE_JPEG_OPTIMIZE, 1,  # Optimizar compresión
-                    cv2.IMWRITE_JPEG_PROGRESSIVE, 1  # JPEG progresivo para carga suave
+                    cv2.IMWRITE_JPEG_QUALITY, 75,    # Calidad balanceada para velocidad
+                    cv2.IMWRITE_JPEG_OPTIMIZE, 0,    # Sin optimización = más rápido
+                    cv2.IMWRITE_JPEG_PROGRESSIVE, 0  # Sin progresivo = más rápido
                 ]
                 
                 ret, buffer = cv2.imencode('.jpg', frame, encode_params)
@@ -1133,15 +1136,80 @@ def webcam_stream():
                     continue
                 
                 frame_data = buffer.tobytes()
+                # Stream optimizado: headers mínimos para máxima velocidad
                 yield (b'--frame\r\n'
                        b'Content-Type: image/jpeg\r\n'
-                       b'Content-Length: ' + str(len(frame_data)).encode() + b'\r\n\r\n' + 
+                       b'Cache-Control: no-cache\r\n'
+                       b'\r\n' + 
                        frame_data + b'\r\n')
                 
         finally:
             cap.release()
     
-    return Response(generate(), mimetype='multipart/x-mixed-replace; boundary=frame')
+    # Response optimizada para streaming de alta velocidad
+    response = Response(generate(), mimetype='multipart/x-mixed-replace; boundary=frame')
+    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    response.headers['Connection'] = 'close'
+    return response
+
+@app.route('/api/webcam-performance', methods=['GET'])
+def get_webcam_performance():
+    """Obtener estadísticas de rendimiento del stream webcam"""
+    try:
+        # Calcular FPS estimado basado en configuración
+        video_fps = 30  # FPS de captura
+        processing_fps = 30 / 4  # Procesamos cada 4 frames
+        
+        performance_info = {
+            'status': 'optimized',
+            'video_capture_fps': video_fps,
+            'ai_processing_fps': processing_fps,
+            'resolution': '480x360',
+            'optimizations': [
+                'Resolución reducida para velocidad máxima',
+                'Procesamiento IA cada 4 frames (7.5 FPS)',
+                'Codificación JPEG optimizada para velocidad',
+                'Stream con headers mínimos',
+                'Threshold de confianza ajustado (0.4)',
+                'Aceleración GPU en frontend'
+            ],
+            'expected_performance': '30 FPS video, 7.5 FPS detecciones',
+            'compression_quality': 75,
+            'frame_skip_ratio': '3:1'  # Procesamos 1 de cada 4 frames
+        }
+        
+        return jsonify(performance_info)
+        
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500
+
+@app.route('/api/model-system-info', methods=['GET'])
+def get_model_system_info():
+    """Obtener información completa del sistema de modelos - Para debugging"""
+    try:
+        if enhanced_handler:
+            system_info = enhanced_handler.get_system_info()
+            return jsonify({
+                'status': 'success',
+                'system_info': system_info,
+                'timestamp': time.time()
+            })
+        else:
+            return jsonify({
+                'status': 'error',
+                'message': 'Enhanced handler no disponible',
+                'system_info': None
+            }), 500
+            
+    except Exception as e:
+        return jsonify({
+            'status': 'error', 
+            'message': str(e),
+            'system_info': None
+        }), 500
 
 @app.route('/api/webcam', methods=['POST'])
 def webcam_detect():
@@ -1151,10 +1219,10 @@ def webcam_detect():
     
     try:
         data = request.get_json()
-        print(f"🔍 Webcam POST - Datos recibidos: {type(data)}")
+        print(f"Webcam POST - Datos recibidos: {type(data)}")
         
         if not data or 'image' not in data:
-            print(f"❌ Error: datos={data}, tiene image={data and 'image' in data if data else False}")
+            print(f"Error: datos={data}, tiene image={data and 'image' in data if data else False}")
             return jsonify({'error': 'No image data provided'}), 400
         
         image_data = data['image']
@@ -1350,21 +1418,21 @@ def webcam_page():
     </head>
     <body>
         <div class="container">
-            <h1>🎥 Detección en Tiempo Real</h1>
+            <h1>Detección en Tiempo Real</h1>
             
             <div class="webcam-container">
                 <h2>Webcam en Vivo</h2>
                 <img id="webcamFeed" class="webcam-feed" src="/api/webcam" alt="Webcam Feed">
                 
                 <div class="controls">
-                    <button class="btn" onclick="startWebcam()">▶️ Iniciar</button>
-                    <button class="btn" onclick="stopWebcam()">⏹️ Detener</button>
-                    <button class="btn" onclick="refreshWebcam()">🔄 Refrescar</button>
+                    <button class="btn" onclick="startWebcam()">Iniciar</button>
+                    <button class="btn" onclick="stopWebcam()">Detener</button>
+                    <button class="btn" onclick="refreshWebcam()">Refrescar</button>
                 </div>
             </div>
             
             <div class="info">
-                <h3>📊 Sistema AI Ensemble TTA</h3>
+                <h3>Sistema AI Ensemble TTA</h3>
                 <p><strong>Animales detectados:</strong> Gatos, Gallinas, Vacas, Perros, Caballos</p>
                 <p><strong>Detección:</strong> Tiempo real con filtrado inteligente</p>
                 <p><strong>Resolución:</strong> 640x480 @ 30 FPS</p>
@@ -1412,7 +1480,7 @@ if __name__ == '__main__':
     load_video_status()  # Cargar estado persistente de videos
     
     port = int(os.environ.get('FLASK_PORT', 5003))
-    print(f"🚀 Iniciando aplicación de detección de animales...")
+    print(f"Iniciando aplicación de detección de animales...")
     print(f"📱 Abre http://0.0.0.0:{port} en tu navegador")
     
     # Deshabilitar auto-reload para evitar interrumpir el procesamiento de videos

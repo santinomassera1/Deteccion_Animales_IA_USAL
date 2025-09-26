@@ -144,8 +144,8 @@ const useAppState = () => {
       
       addNotification({
         type: 'success',
-        title: 'Procesamiento iniciado',
-        message: 'El video está siendo procesado. Puedes monitorear el progreso aquí.',
+        title: '¡Video en procesamiento!',
+        message: 'Tu video se está analizando.',
       });
       
       // Start polling for status updates
@@ -168,15 +168,15 @@ const useAppState = () => {
             console.log('🎉 Procesamiento completado!');
             addNotification({
               type: 'success',
-              title: 'Procesamiento completado',
-              message: 'El video ha sido procesado exitosamente.',
+              title: '¡Listo! Tu video está procesado',
+              message: 'Ya podés ver todos los animales detectados en tu video',
             });
           } else if (status.status === 'failed') {
             console.error('💥 Procesamiento falló:', status.error);
             addNotification({
               type: 'error',
-              title: 'Error en el procesamiento',
-              message: status.error || 'El procesamiento del video falló.',
+              title: 'Ups! Algo no salió bien',
+              message: 'Hubo un problema al procesar tu video. ¿Podrías intentarlo de nuevo?',
             });
           }
         } catch (error) {
@@ -594,7 +594,7 @@ const ImageDetection = ({
             Detección en Imágenes
           </h3>
           <p className="text-sm text-gray-600 mb-6">
-            Sube una imagen para detectar animales usando el sistema Ensemble TTA de ultra precisión
+            Sube una imagen para detectar automáticamente los animales que aparecen en ella
           </p>
           
           <div
@@ -791,7 +791,7 @@ const VideoDetection = ({
             Procesamiento de Videos
           </h3>
           <p className="text-sm text-gray-600 mb-6">
-            Sube un video para detectar animales frame por frame
+            Sube un video para detectar y analizar animales a lo largo de toda la grabación
           </p>
           
           <div
@@ -1033,14 +1033,14 @@ const App = () => {
           if (status.model_loaded) {
             addNotification({
               type: 'success',
-              title: 'Modelo cargado',
-              message: 'El sistema Ensemble TTA está listo para detectar animales con ultra precisión',
+              title: '¡Bienvenido al Sistema de Detección Veterinaria!',
+              message: 'Todo está listo para detectar y analizar animales. ¡Comenzá subiendo una imagen o video!',
             });
           } else {
             addNotification({
-              type: 'warning',
-              title: 'Modelo no disponible',
-              message: 'El modelo aún se está cargando. Inténtalo en unos momentos.',
+              type: 'info',
+              title: '¡Bienvenido!',
+              message: 'Estamos preparando el sistema para vos. Solo unos momentos más...',
             });
           }
         }
@@ -1049,9 +1049,9 @@ const App = () => {
         if (mounted) {
           setIsConnected(false); // Connection failed
           addNotification({
-            type: 'error',
-            title: 'Error de conexión',
-            message: 'No se pudo conectar con el servidor. Verifica que esté ejecutándose en http://localhost:5003',
+            type: 'warning',
+            title: 'Oops! No pudimos conectarnos',
+            message: 'Parece que el servidor no está disponible. Por favor, verificá que esté funcionando correctamente.',
           });
         }
       }

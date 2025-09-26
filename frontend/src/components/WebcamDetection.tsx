@@ -49,29 +49,31 @@ const WebcamDetection = () => {
       if (streamImageRef.current) {
           console.log('📡 Configurando stream URL:', apiService.getWebcamStreamUrl());
           
-          // Configurar opciones anti-flickering
+          // Configurar optimizaciones MÁXIMAS para fluidez
           const img = streamImageRef.current;
-          img.style.imageRendering = 'auto';
+          img.style.imageRendering = 'pixelated';    // Render más rápido para video en tiempo real
           img.style.backfaceVisibility = 'hidden';
           img.style.transform = 'translateZ(0)';
+          img.style.willChange = 'transform';        // Optimización GPU
+          img.style.filter = 'contrast(1.1)';       // Mejorar contraste para compensar compresión
           
           // Set source con parámetros anti-cache para mejor streaming
           const streamUrl = apiService.getWebcamStreamUrl() + '?t=' + Date.now();
           img.src = streamUrl;
         
         img.onload = () => {
-            console.log('✅ Stream conectado con tracking YOLO');
+            console.log('✅ Stream conectado');
           setIsStreamConnected(true);
           addNotification({
             type: 'success',
-              title: 'Stream con tracking YOLO iniciado',
-              message: 'Cámara con detección estable y sin parpadeo activada',
+              title: 'Cámara iniciada correctamente',
+              message: 'La detección en tiempo real está funcionando perfectamente',
           });
         };
 
           img.onerror = (error) => {
             console.error('❌ Error en stream:', error);
-          setStreamError('No se pudo conectar al streaming optimizado');
+          setStreamError('No se pudo conectar a la cámara');
           setIsStreamConnected(false);
           addNotification({
             type: 'error',
@@ -202,17 +204,11 @@ const WebcamDetection = () => {
               Detección en tiempo real
             </h3>
             <p className="text-sm text-gray-600 mt-1">
-              Detección con tracking YOLO - Eliminación de parpadeo y seguimiento estable
+              Detecta animales usando tu cámara en tiempo real
             </p>
           </div>
         </div>
 
-        {/* Description */}
-        <div className="mt-4 p-3 bg-green-50 rounded-lg">
-          <p className="text-sm text-green-700">
-            🎯 Streaming optimizado: Tracking YOLO integrado elimina parpadeo y mantiene IDs estables entre frames
-          </p>
-        </div>
       </motion.div>
 
       {/* Webcam Controls */}
@@ -235,12 +231,9 @@ const WebcamDetection = () => {
             </p>
             {isStreamConnected && (
               <p className="text-xs text-green-500 mt-1">
-                📹 Stream conectado - Detección automática activa
+                Stream conectado - Detección automática activa
               </p>
             )}
-            <p className="text-xs text-gray-500 mt-1">
-              Estado: webcamActive={webcamActive.toString()}, streamConnected={isStreamConnected.toString()}
-            </p>
           </div>
           
           <div className="flex space-x-2">
@@ -301,12 +294,14 @@ const WebcamDetection = () => {
                 <img
                   ref={streamImageRef}
                   alt="Streaming de cámara con detecciones"
-                  className="w-full h-auto rounded-lg shadow-sm bg-gray-100 transition-opacity duration-100"
+                  className="w-full h-auto rounded-lg shadow-sm bg-gray-100"
                   style={{ 
                     minHeight: '300px',
-                    imageRendering: 'auto',
+                    imageRendering: 'pixelated',        // Render optimizado para video
                     backfaceVisibility: 'hidden',
-                    transform: 'translateZ(0)' // Forzar aceleración por GPU
+                    transform: 'translateZ(0)',         // Aceleración GPU
+                    willChange: 'transform',            // Optimización de animación
+                    filter: 'contrast(1.1)'            // Mejorar contraste
                   }}
                 />
                   {isStreamConnected && (

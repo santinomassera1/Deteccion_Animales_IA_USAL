@@ -23,14 +23,49 @@ class EnhancedModelHandler:
         # FORZAR CPU - Deshabilitar CUDA completamente para Mac
         self._force_cpu_mode()
         
-        # Paths de modelos disponibles
-        self.model_paths = {
-            'primary': 'Entrenamiento vet con cuda/runs/animals_training_m/weights/best.pt',
-            'secondary': 'Entrenamiento vet con cuda/runs/animals_training_m/weights/last.pt',
-            'yolo11n': 'Entrenamiento vet con cuda/yolo11n.pt',
-            'yolov8m': 'Entrenamiento vet con cuda/yolov8m.pt',
-            'yolov8s': 'Entrenamiento vet con cuda/yolov8s.pt'
+        # Sistema robusto de detección de modelos - PORTABLE
+        self.base_dir = Path(__file__).parent.absolute()
+        self.models_dir = self.base_dir / "models"
+        
+        # Asegurar que la carpeta models existe
+        self.models_dir.mkdir(exist_ok=True)
+        
+        # Configuración de modelos con fallbacks automáticos
+        self.model_config = {
+            'primary': {
+                'path': 'models/animals_best.pt',
+                'fallback': 'models/yolov8m.pt',
+                'auto_download': 'yolov8m.pt',
+                'description': 'Modelo entrenado principal (animals_best.pt)'
+            },
+            'secondary': {
+                'path': 'models/animals_last.pt', 
+                'fallback': 'models/yolov8s.pt',
+                'auto_download': 'yolov8s.pt',
+                'description': 'Modelo entrenado secundario (animals_last.pt)'
+            },
+            'yolo11n': {
+                'path': 'models/yolo11n.pt',
+                'fallback': None,
+                'auto_download': 'yolo11n.pt',
+                'description': 'YOLO 11 Nano'
+            },
+            'yolov8m': {
+                'path': 'models/yolov8m.pt',
+                'fallback': None,
+                'auto_download': 'yolov8m.pt', 
+                'description': 'YOLO v8 Medium'
+            },
+            'yolov8s': {
+                'path': 'models/yolov8s.pt',
+                'fallback': None,
+                'auto_download': 'yolov8s.pt',
+                'description': 'YOLO v8 Small'
+            }
         }
+        
+        # Detectar y preparar modelos disponibles
+        self.model_paths = self._discover_available_models()
         
     def _fix_torch_load(self):
         """Fix para el problema de PyTorch 2.6 weights_only"""
@@ -42,7 +77,7 @@ class EnhancedModelHandler:
             return original_load(*args, **kwargs)
         
         torch.load = patched_load
-        print("🔧 PyTorch load fix aplicado")
+        print("PyTorch load fix aplicado")
     
     def _force_cpu_mode(self):
         """Forzar modo CPU y deshabilitar CUDA completamente"""
@@ -53,51 +88,154 @@ class EnhancedModelHandler:
         os.environ['CUDA_VISIBLE_DEVICES'] = ''
         os.environ['CUDA_DEVICE_ORDER'] = 'PCI_BUS_ID'
         
-        print("🖥️  Modo CPU forzado - CUDA deshabilitado para compatibilidad Mac")
+        print("Modo CPU forzado - CUDA deshabilitado para compatibilidad Mac")
         print(f"   - torch.cuda.is_available(): {torch.cuda.is_available()}")
         print(f"   - torch.cuda.device_count(): {torch.cuda.device_count()}")
         
         if torch.cuda.is_available():
-            print("⚠️  CUDA aún detectado, pero se usará CPU forzosamente")
+            print("CUDA aún detectado, pero se usará CPU forzosamente")
+
+    def _discover_available_models(self):
+        """Detectar modelos disponibles con sistema robusto de fallbacks"""
+        available_models = {}
+        print("\nIniciando detección inteligente de modelos...")
         
+        for model_name, config in self.model_config.items():
+            model_path = self.base_dir / config['path']
+            fallback_path = self.base_dir / config['fallback'] if config['fallback'] else None
+            final_path = None
+            
+            print(f"\n📦 Verificando {config['description']}:")
+            print(f"   - Ruta principal: {model_path}")
+            
+            # 1. Verificar ruta principal
+            if model_path.exists():
+                final_path = str(model_path)
+                print(f"   Encontrado en ruta principal")
+            
+            # 2. Verificar fallback
+            elif fallback_path and fallback_path.exists():
+                final_path = str(fallback_path)
+                print(f"   Usando fallback: {fallback_path}")
+            
+            # 3. Intentar descarga automática
+            elif config['auto_download']:
+                try:
+                    print(f"   🌐 Intentando descarga automática: {config['auto_download']}")
+                    # YOLO automáticamente descarga modelos básicos
+                    temp_model = YOLO(config['auto_download'])
+                    # Copiar el modelo descargado a nuestra carpeta
+                    downloaded_path = self.models_dir / config['auto_download']
+                    if not downloaded_path.exists() and hasattr(temp_model, 'ckpt_path'):
+                        import shutil
+                        shutil.copy2(temp_model.ckpt_path, downloaded_path)
+                        print(f"   Descargado y guardado en: {downloaded_path}")
+                    final_path = str(downloaded_path)
+                except Exception as e:
+                    print(f"   Error en descarga automática: {e}")
+            
+            if final_path:
+                available_models[model_name] = final_path
+                print(f"   DISPONIBLE: {final_path}")
+            else:
+                print(f"   NO DISPONIBLE: {model_name}")
+        
+        print(f"\nRESUMEN: {len(available_models)}/{len(self.model_config)} modelos disponibles")
+        
+        if not available_models:
+            print("\nADVERTENCIA: No se encontraron modelos!")
+            print("   Creando configuración de emergencia con modelos básicos...")
+            # Configuración de emergencia
+            try:
+                emergency_model = YOLO('yolov8n.pt')  # Modelo más pequeño
+                emergency_path = self.models_dir / 'emergency_yolov8n.pt'
+                available_models['emergency'] = str(emergency_path)
+                print(f"   Modelo de emergencia preparado: {emergency_path}")
+            except Exception as e:
+                print(f"   Error crítico: No se pudo preparar modelo de emergencia: {e}")
+                raise RuntimeError("FATAL: No hay modelos disponibles y no se puede descargar automáticamente")
+        
+        return available_models
+
     def load_models(self):
-        """Cargar múltiples modelos para ensemble"""
-        print("🔄 Cargando modelos para ensemble mejorado...")
+        """Cargar múltiples modelos usando el sistema robusto"""
+        print("\nIniciando carga de modelos con sistema robusto...")
+        
+        if not self.model_paths:
+            print("FATAL: No hay modelos disponibles después de la detección")
+            return False
         
         loaded_count = 0
+        successful_models = []
         
-        # Intentar cargar modelo principal (entrenado)
+        # Cargar cada modelo detectado
         for model_name, model_path in self.model_paths.items():
-            if os.path.exists(model_path):
-                try:
-                    print(f"🔄 Intentando cargar {model_name}: {model_path}")
-                    model = YOLO(model_path)
-                    self.models[model_name] = model
+            try:
+                print(f"\nCargando {model_name}...")
+                print(f"   📂 Ruta: {model_path}")
+                
+                # Verificar que el archivo existe (redundante pero seguro)
+                if not os.path.exists(model_path):
+                    print(f"   Archivo no existe en el momento de carga")
+                    continue
+                
+                # Cargar modelo con manejo de errores robusto
+                model = YOLO(model_path)
+                
+                # Verificar que el modelo se cargó correctamente
+                if not hasattr(model, 'model') or model.model is None:
+                    print(f"   Modelo cargado pero estructura inválida")
+                    continue
+                
+                self.models[model_name] = model
+                
+                # Información detallada del modelo
+                if hasattr(model.model, 'names'):
+                    classes = list(model.model.names.values()) if model.model.names else []
+                    print(f"   Cargado exitosamente")
+                    print(f"   Clases: {len(classes)}")
+                    print(f"   Algunas clases: {classes[:5] if classes else 'Sin información'}")
                     
-                    # Información del modelo
-                    if hasattr(model.model, 'names'):
-                        classes = list(model.model.names.values())
-                        print(f"✅ {model_name} cargado: {len(classes)} clases")
-                        
-                        # Verificar si tiene nuestras 5 clases de animales
-                        target_classes = ['cat', 'chicken', 'cow', 'dog', 'horse']
-                        if all(cls in classes for cls in target_classes):
-                            print(f"   🎯 Modelo compatible con detección de animales")
-                            loaded_count += 1
-                        else:
-                            print(f"   ⚠️ Clases disponibles: {classes[:10]}")
-                            
-                except Exception as e:
-                    print(f"❌ Error cargando {model_name}: {e}")
-            else:
-                print(f"⚠️ Modelo no encontrado: {model_path}")
+                    # Verificar compatibilidad con animales
+                    target_classes = ['cat', 'chicken', 'cow', 'dog', 'horse']
+                    animal_classes_found = [cls for cls in target_classes if cls in classes]
+                    
+                    if animal_classes_found:
+                        print(f"   Compatible con animales: {animal_classes_found}")
+                        successful_models.append(model_name)
+                    else:
+                        print(f"   📝 Modelo genérico (COCO/otros): {classes[:3] if classes else []}")
+                        successful_models.append(model_name)  # Aceptar modelos genéricos también
+                else:
+                    print(f"   Sin información de clases, pero modelo cargado")
+                    successful_models.append(model_name)
+                
+                loaded_count += 1
+                
+            except Exception as e:
+                print(f"   Error cargando {model_name}: {e}")
+                print(f"   Tipo de error: {type(e).__name__}")
+                continue
+        
+        # Resultado final
+        print(f"\nRESULTADO FINAL:")
+        print(f"   Modelos cargados: {loaded_count}/{len(self.model_paths)}")
+        print(f"   Modelos exitosos: {successful_models}")
         
         if loaded_count > 0:
             self.model_loaded = True
-            print(f"✅ {loaded_count} modelos cargados para ensemble")
+            print(f"\n¡Sistema preparado! {loaded_count} modelos listos para ensemble")
+            
+            # Mostrar configuración final
+            print(f"\nCONFIGURACIÓN FINAL:")
+            for name in successful_models:
+                print(f"   - {name}: {self.model_paths[name]}")
+            
             return True
         else:
-            print("❌ No se pudo cargar ningún modelo")
+            print(f"\nFALLA CRÍTICA: No se pudo cargar ningún modelo")
+            print(f"   Verificar que los archivos .pt existen y son válidos")
+            print(f"   💡 La app intentará usar descarga automática en el próximo inicio")
             return False
     
     def predict_with_tta(self, image, confidence_threshold=0.5):
@@ -162,13 +300,13 @@ class EnhancedModelHandler:
                                     all_predictions.append(detection)
                                     
                 except Exception as e:
-                    print(f"⚠️ Error en predicción {model_name}-{aug_name}: {e}")
+                    print(f"Error en predicción {model_name}-{aug_name}: {e}")
                     continue
         
         # Post-procesamiento avanzado
         final_predictions = self._advanced_post_processing(all_predictions)
         
-        print(f"🔍 TTA Ensemble: {len(all_predictions)} predicciones brutas -> {len(final_predictions)} finales")
+        print(f"TTA Ensemble: {len(all_predictions)} predicciones brutas -> {len(final_predictions)} finales")
         
         return final_predictions
     
@@ -386,30 +524,141 @@ class EnhancedModelHandler:
         union = area1 + area2 - intersection
         
         return intersection / union if union > 0 else 0.0
+    
+    def get_system_info(self):
+        """Obtener información completa del sistema de modelos - Para debugging"""
+        print("\nINFORMACIÓN COMPLETA DEL SISTEMA DE MODELOS")
+        print("=" * 60)
+        
+        info = {
+            'system_status': 'operational' if self.model_loaded else 'error',
+            'base_directory': str(self.base_dir),
+            'models_directory': str(self.models_dir),
+            'models_dir_exists': self.models_dir.exists(),
+            'total_models_configured': len(self.model_config),
+            'models_detected': len(self.model_paths),
+            'models_loaded': len(self.models),
+            'model_details': {},
+            'configuration': self.model_config,
+            'paths': self.model_paths
+        }
+        
+        # Información de cada modelo configurado
+        print(f"\nMODELOS CONFIGURADOS ({len(self.model_config)}):")
+        for name, config in self.model_config.items():
+            model_path = self.base_dir / config['path']
+            fallback_path = self.base_dir / config['fallback'] if config['fallback'] else None
+            
+            status = "NO DISPONIBLE"
+            actual_path = None
+            
+            if model_path.exists():
+                status = "DISPONIBLE"
+                actual_path = str(model_path)
+            elif fallback_path and fallback_path.exists():
+                status = "FALLBACK"
+                actual_path = str(fallback_path)
+            
+            info['model_details'][name] = {
+                'description': config['description'],
+                'configured_path': str(model_path),
+                'fallback_path': str(fallback_path) if fallback_path else None,
+                'exists': actual_path is not None,
+                'actual_path': actual_path,
+                'loaded': name in self.models,
+                'auto_download': config['auto_download']
+            }
+            
+            print(f"   {status} {config['description']}")
+            print(f"      🔗 Ruta: {model_path}")
+            if fallback_path:
+                print(f"      Fallback: {fallback_path}")
+            if actual_path:
+                print(f"      Encontrado: {actual_path}")
+            if name in self.models:
+                print(f"      Estado: CARGADO")
+                # Información adicional del modelo cargado
+                model = self.models[name]
+                if hasattr(model.model, 'names') and model.model.names:
+                    classes = list(model.model.names.values())
+                    print(f"      Clases: {len(classes)} ({classes[:3]}...)")
+                    
+        # Estado de la carpeta models
+        print(f"\n📁 CARPETA MODELS:")
+        print(f"   🔗 Ruta: {self.models_dir}")
+        print(f"   Existe: {self.models_dir.exists()}")
+        
+        if self.models_dir.exists():
+            pt_files = list(self.models_dir.glob("*.pt"))
+            print(f"   📦 Archivos .pt encontrados: {len(pt_files)}")
+            for pt_file in pt_files[:10]:  # Mostrar máximo 10
+                size_mb = pt_file.stat().st_size / (1024*1024)
+                print(f"      - {pt_file.name} ({size_mb:.1f} MB)")
+        
+        # Recomendaciones
+        print(f"\n💡 RECOMENDACIONES:")
+        if info['system_status'] == 'operational':
+            print("   Sistema funcionando correctamente")
+        else:
+            print("   Sistema con problemas")
+            if info['models_loaded'] == 0:
+                print("   No hay modelos cargados - verificar rutas")
+                print("   💾 Ejecutar: python enhanced_model_handler.py para diagnóstico")
+            
+        if info['models_detected'] < info['total_models_configured']:
+            missing = info['total_models_configured'] - info['models_detected']
+            print(f"   Faltan {missing} modelos - descarga automática disponible")
+            
+        print("=" * 60)
+        return info
 
-# Función de prueba
+# Función de prueba y diagnóstico
 def test_enhanced_model():
-    """Probar el modelo mejorado"""
-    print("🧪 PROBANDO MODELO MEJORADO...")
+    """Probar el modelo mejorado con diagnóstico completo"""
+    print("🧪 PROBANDO SISTEMA ROBUSTO DE MODELOS...")
     
     handler = EnhancedModelHandler()
     
+    # Mostrar información completa del sistema
+    system_info = handler.get_system_info()
+    
+    print(f"\nINTENTANDO CARGAR MODELOS...")
     if handler.load_models():
-        print("✅ Modelos cargados exitosamente")
+        print("\n¡MODELOS CARGADOS EXITOSAMENTE!")
+        
+        # Mostrar información post-carga
+        print(f"Modelos activos: {len(handler.models)}")
+        for name, model in handler.models.items():
+            print(f"   - {name}: {handler.model_paths[name]}")
         
         # Imagen de prueba
+        print(f"\nProbando predicción con imagen de prueba...")
         test_image = np.ones((480, 640, 3), dtype=np.uint8) * 128
         
         # Predicción mejorada
-        predictions = handler.predict_with_tta(test_image, confidence_threshold=0.5)
+        predictions = handler.predict_with_tta(test_image, confidence_threshold=0.3)
         
-        print(f"🎯 Predicciones finales: {len(predictions)}")
+        print(f"Predicciones finales: {len(predictions)}")
         for i, pred in enumerate(predictions):
             print(f"   {i+1}. {pred['class_name']}: {pred['confidence']:.3f} ({pred.get('model', 'unknown')})")
         
+        print(f"\n¡SISTEMA COMPLETAMENTE FUNCIONAL!")
         return True
     else:
-        print("❌ No se pudieron cargar los modelos")
+        print(f"\nFALLA EN CARGA DE MODELOS")
+        print(f"Información del sistema:")
+        print(f"   - Directorio base: {system_info['base_directory']}")
+        print(f"   - Directorio models: {system_info['models_directory']}")
+        print(f"   - Models existe: {system_info['models_dir_exists']}")
+        print(f"   - Modelos detectados: {system_info['models_detected']}")
+        print(f"   - Modelos cargados: {system_info['models_loaded']}")
+        
+        print(f"\n💡 SOLUCIONES:")
+        print(f"   1. Verificar que la carpeta 'models' existe")
+        print(f"   2. Verificar que hay archivos .pt en la carpeta")
+        print(f"   3. Ejecutar 'git pull' para obtener los modelos")
+        print(f"   4. La descarga automática se intentará si falta algo")
+        
         return False
 
 if __name__ == "__main__":

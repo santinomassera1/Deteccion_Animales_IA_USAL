@@ -52,7 +52,7 @@ const Header = ({ isConnected = true }: HeaderProps) => {
             {/* Indicador de modelo activo */}
             <div className="flex items-center space-x-2 bg-white bg-opacity-20 rounded-lg px-4 py-2">
               <CpuChipIcon className="w-5 h-5 text-yellow-200" />
-              <span className="text-sm font-medium">Sistema Ensemble TTA Activo</span>
+              <span className="text-sm font-medium">Sistema de Detección Listo</span>
             </div>
             
             {/* Indicador de conexión */}

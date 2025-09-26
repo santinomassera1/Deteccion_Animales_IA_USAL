@@ -117,8 +117,15 @@ $RECYCLE.BIN/
 # Linux
 *~
 
-# Model weights (commented out - you might want to keep these)
-# *.pt
+# Model weights - Configuración inteligente
+# Permitir README.md en carpeta models pero ignorar archivos .pt grandes
+models/*.pt
+!models/README.md
+
+# Otros archivos de modelo pesados
+*.onnx
+*.engine
+*.trt
 
 # Temporary files
 *.tmp

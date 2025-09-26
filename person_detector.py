@@ -11,17 +11,17 @@ from ultralytics import YOLO
 class PersonDetector:
     def __init__(self, nacho_model=None):
         """Inicializar detector de personas usando el modelo principal"""
-        print("🔄 Cargando detector de personas...")
+        print("Cargando detector de personas...")
         if nacho_model is not None:
             # Usar el modelo CUDA YOLOv8m si está disponible
             self.model = nacho_model
-            print("✅ Detector de personas usando modelo CUDA YOLOv8m")
+            print("Detector de personas usando modelo CUDA YOLOv8m")
         else:
             # Fallback al modelo pre-entrenado si no hay modelo principal
             self.model = YOLO('yolov8n.pt')  # Modelo pre-entrenado con COCO
-            print("✅ Detector de personas usando modelo pre-entrenado (fallback)")
+            print("Detector de personas usando modelo pre-entrenado (fallback)")
         self.person_class_id = 0  # Clase 'person' en COCO dataset
-        print("✅ Detector de personas cargado exitosamente!")
+        print("Detector de personas cargado exitosamente!")
     
     def detect_persons(self, image, confidence_threshold=0.5):
         """Detectar solo personas en la imagen"""
@@ -58,7 +58,7 @@ class PersonDetector:
             return person_detections
             
         except Exception as e:
-            print(f"❌ Error detectando personas: {e}")
+            print(f"Error detectando personas: {e}")
             return []
     
     def draw_person_detections(self, image, detections):

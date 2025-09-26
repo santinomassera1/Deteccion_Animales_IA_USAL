@@ -153,8 +153,8 @@ const VideoDetection = () => {
           if (status.status === 'completed') {
             addNotification({
               type: 'success',
-              title: 'Video procesado con tracking YOLO',
-              message: 'El video ha sido procesado con detección estable y sin parpadeo.',
+              title: 'Video procesado exitosamente',
+              message: 'El video ha sido procesado correctamente.',
             });
           }
         }
@@ -246,7 +246,7 @@ const VideoDetection = () => {
                 }
               </h3>
               <p className="mt-2 text-sm text-gray-500">
-                Con tracking YOLO integrado - Elimina parpadeo automáticamente<br/>
+                Detección optimizada para mejores resultados<br/>
                 Soporta MP4, AVI, MOV, MKV, WMV, FLV (máx. 150MB)
               </p>
             </div>
@@ -335,7 +335,7 @@ const VideoDetection = () => {
                 
                 {/* Información del tracking */}
                 <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded text-xs text-blue-700">
-                  🎯 Aplicando tracking YOLO en tiempo real - Eliminando parpadeo
+                  Procesando video - Analizando cada frame
                 </div>
               </div>
             )}
@@ -344,12 +344,12 @@ const VideoDetection = () => {
               <div className="space-y-4">
                 <div className="flex items-center space-x-2 text-green-600">
                   <ChartBarIcon className="w-5 h-5" />
-                  <span className="font-medium">Video procesado con tracking YOLO</span>
+                  <span className="font-medium">Video procesado exitosamente</span>
                 </div>
                 
                 <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-3">
                   <p className="text-sm text-green-700">
-                    🎯 <strong>Mejoras aplicadas:</strong> Tracking de objetos, eliminación de parpadeo, IDs estables entre frames
+                    <strong>Video procesado exitosamente:</strong> Detección optimizada aplicada en todos los frames
                   </p>
                 </div>
                 
@@ -418,7 +418,7 @@ const VideoDetection = () => {
         >
           <div className="flex items-center justify-center space-x-2">
             <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary-600"></div>
-            <span className="text-gray-600">Inicializando tracking YOLO<span className="loading-dots"></span></span>
+            <span className="text-gray-600">Inicializando sistema<span className="loading-dots"></span></span>
           </div>
         </motion.div>
       )}
