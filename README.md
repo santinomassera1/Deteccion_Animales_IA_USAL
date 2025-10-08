@@ -121,11 +121,10 @@ cd Deteccion_Animales_IA_USAL
 
 ### **2. Configuración del Backend:**
 ```bash
-# Instalar dependencias Python
 pip install -r requirements.txt
 
 # Verificar instalación CUDA (opcional)
-python -c "import torch; print(torch.cuda.is_available())"
+python3 -c "import torch; print(torch.cuda.is_available())"
 ```
 
 ### **3. Configuración del Frontend:**
@@ -141,7 +140,7 @@ cd ..
 **Modo Desarrollo:**
 ```bash
 # Terminal 1: Backend
-python app.py
+python3 app.py
 
 # Terminal 2: Frontend (opcional, para desarrollo)
 cd frontend && npm run dev
@@ -150,7 +149,7 @@ cd frontend && npm run dev
 **Modo Producción:**
 ```bash
 # Solo backend (incluye frontend compilado)
-python app.py
+python3 app.py
 ```
 
 La aplicación estará disponible en: **http://localhost:5003**
@@ -290,7 +289,7 @@ python -c "from enhanced_model_handler import EnhancedModelHandler; handler = En
 ```bash
 # Forzar uso de CPU
 export CUDA_VISIBLE_DEVICES=""
-python app.py
+python3 app.py
 ```
 
 ---

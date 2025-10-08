@@ -525,6 +525,131 @@ class EnhancedModelHandler:
         
         return intersection / union if union > 0 else 0.0
     
+    def process_video_with_tracking(self, video_source, confidence_threshold=0.4, callback=None):
+        """
+        Procesa un video o stream con tracking persistente para eliminar parpadeo.
+        
+        Esta función usa el tracking nativo de YOLO (ByteTrack) de forma persistente,
+        manteniendo el estado entre frames para lograr detecciones suaves y estables.
+        
+        Args:
+            video_source: Path al video o índice de cámara (0 para webcam)
+            confidence_threshold: Umbral de confianza (0.0-1.0)
+            callback: Función opcional para reportar progreso (frame_num, total_frames)
+        
+        Yields:
+            dict: {
+                'frame': numpy array del frame procesado con detecciones dibujadas,
+                'detections': lista de detecciones con tracking IDs,
+                'frame_number': número de frame actual
+            }
+        """
+        if not self.model_loaded or not self.models:
+            print("❌ No hay modelos cargados para tracking")
+            return
+        
+        # Seleccionar modelo primario para tracking
+        # Para tracking, usamos UN SOLO modelo (no ensemble) para consistencia
+        model_to_use = None
+        
+        # Prioridad: primary > yolov8m > yolo11n > cualquier otro
+        priority_order = ['primary', 'yolov8m', 'yolo11n', 'yolov8s', 'secondary']
+        
+        for model_key in priority_order:
+            if model_key in self.models:
+                model_to_use = self.models[model_key]
+                print(f"🎯 Usando modelo '{model_key}' para tracking persistente")
+                break
+        
+        if model_to_use is None:
+            # Usar el primer modelo disponible
+            model_key = list(self.models.keys())[0]
+            model_to_use = self.models[model_key]
+            print(f"🎯 Usando modelo '{model_key}' para tracking persistente")
+        
+        print(f"🎬 Iniciando tracking persistente con ByteTrack")
+        print(f"   - Confidence threshold: {confidence_threshold}")
+        print(f"   - Video source: {video_source}")
+        
+        try:
+            # Usar el método .track() nativo de YOLO para tracking persistente
+            # Esto mantiene el estado del tracker entre frames
+            results_generator = model_to_use.track(
+                source=video_source,
+                stream=True,          # Procesar como stream para eficiencia
+                persist=True,         # CRÍTICO: Mantiene IDs entre frames
+                tracker="bytetrack.yaml",  # ByteTrack algorithm
+                conf=confidence_threshold,
+                iou=0.5,             # IoU threshold para tracking
+                imgsz=640,           # Tamaño de imagen optimizado
+                device='cpu',        # Forzar CPU (Mac compatible)
+                half=False,          # No half precision en CPU
+                verbose=False,       # Sin logs excesivos
+                max_det=50,          # Máximo 50 detecciones
+                classes=[0, 1, 2, 3, 4]  # Solo nuestras 5 clases
+            )
+            
+            frame_number = 0
+            
+            # Iterar sobre los resultados del tracking
+            for results in results_generator:
+                frame_number += 1
+                
+                # Obtener el frame procesado con las detecciones dibujadas
+                # results.plot() dibuja automáticamente:
+                # - Bounding boxes
+                # - Tracking IDs
+                # - Confidence scores
+                # - Class labels
+                processed_frame = results.plot()
+                
+                # Extraer información de las detecciones para retornar
+                detections = []
+                
+                if results.boxes is not None and len(results.boxes) > 0:
+                    boxes = results.boxes
+                    
+                    for idx in range(len(boxes)):
+                        # Extraer datos de cada detección
+                        box = boxes.xyxy[idx].cpu().numpy().tolist()
+                        conf = float(boxes.conf[idx])
+                        class_id = int(boxes.cls[idx])
+                        
+                        # Tracking ID (si está disponible)
+                        track_id = None
+                        if boxes.id is not None:
+                            track_id = int(boxes.id[idx])
+                        
+                        # Solo procesar nuestras 5 clases
+                        if class_id < 5:
+                            class_names = ['cat', 'chicken', 'cow', 'dog', 'horse']
+                            detection = {
+                                'box': box,
+                                'confidence': conf,
+                                'class': class_id,
+                                'class_name': class_names[class_id],
+                                'track_id': track_id,
+                                'tracked': track_id is not None
+                            }
+                            detections.append(detection)
+                
+                # Llamar al callback si existe (para reportar progreso)
+                if callback:
+                    callback(frame_number)
+                
+                # Yield el resultado
+                yield {
+                    'frame': processed_frame,
+                    'detections': detections,
+                    'frame_number': frame_number
+                }
+        
+        except Exception as e:
+            print(f"❌ Error en tracking persistente: {e}")
+            import traceback
+            traceback.print_exc()
+            return
+    
     def get_system_info(self):
         """Obtener información completa del sistema de modelos - Para debugging"""
         print("\nINFORMACIÓN COMPLETA DEL SISTEMA DE MODELOS")
