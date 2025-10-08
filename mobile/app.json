@@ -1,0 +1,41 @@
+{
+  "expo": {
+    "name": "Detección Animales USAL",
+    "slug": "deteccion-animales-usal",
+    "version": "1.0.0",
+    "sdkVersion": "54.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.usal.deteccionanimales"
+    },
+    "android": {
+      "package": "com.usal.deteccionanimales",
+      "permissions": [
+        "CAMERA",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE"
+      ]
+    },
+    "plugins": [
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Permitir que $(PRODUCT_NAME) acceda a tu cámara para detectar animales.",
+          "microphonePermission": "Permitir que $(PRODUCT_NAME) acceda al micrófono."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "La aplicación necesita acceso a tus fotos para detectar animales."
+        }
+      ]
+    ]
+  }
+}
+
