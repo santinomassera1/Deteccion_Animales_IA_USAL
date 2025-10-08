@@ -1,0 +1,122 @@
+/* Colores oficiales de la Universidad del Salvador */
+:root {
+  /* Colores principales USAL */
+  --usal-green: #22c55e;        /* Verde claro USAL */
+  --usal-green-dark: #16a34a;   /* Verde más oscuro */
+  --usal-yellow: #fbbf24;       /* Amarillo claro USAL */
+  --usal-yellow-dark: #f59e0b;  /* Amarillo más oscuro */
+  --usal-red: #ef4444;          /* Rojo claro USAL */
+  --usal-red-dark: #dc2626;     /* Rojo más oscuro */
+  --usal-gray: #6b7280;         /* Gris USAL */
+  --usal-gray-dark: #374151;    /* Gris oscuro */
+  --usal-white: #ffffff;        /* Blanco */
+  --usal-black: #000000;        /* Negro */
+  
+  /* Gradientes USAL */
+  --usal-gradient-green: linear-gradient(135deg, #22c55e, #16a34a);
+  --usal-gradient-yellow: linear-gradient(135deg, #fbbf24, #f59e0b);
+  --usal-gradient-red: linear-gradient(135deg, #ef4444, #dc2626);
+  --usal-gradient-main: linear-gradient(135deg, #22c55e, #fbbf24);
+  
+  /* Colores de fondo suaves */
+  --usal-bg-light: #f0fdf4;     /* Verde muy claro */
+  --usal-bg-yellow: #fffbeb;    /* Amarillo muy claro */
+  --usal-bg-red: #fef2f2;       /* Rojo muy claro */
+  --usal-bg-gray: #f9fafb;      /* Gris muy claro */
+}
+
+/* Clases utilitarias para colores USAL */
+.bg-usal-green {
+  background-color: var(--usal-green);
+}
+
+.bg-usal-yellow {
+  background-color: var(--usal-yellow);
+}
+
+.bg-usal-red {
+  background-color: var(--usal-red);
+}
+
+.text-usal-green {
+  color: var(--usal-green);
+}
+
+.text-usal-yellow {
+  color: var(--usal-yellow);
+}
+
+.text-usal-red {
+  color: var(--usal-red);
+}
+
+.border-usal-green {
+  border-color: var(--usal-green);
+}
+
+.border-usal-yellow {
+  border-color: var(--usal-yellow);
+}
+
+.border-usal-red {
+  border-color: var(--usal-red);
+}
+
+/* Gradientes USAL */
+.bg-gradient-usal {
+  background: var(--usal-gradient-main);
+}
+
+.bg-gradient-usal-green {
+  background: var(--usal-gradient-green);
+}
+
+.bg-gradient-usal-yellow {
+  background: var(--usal-gradient-yellow);
+}
+
+.bg-gradient-usal-red {
+  background: var(--usal-gradient-red);
+}
+
+/* Fondos suaves USAL */
+.bg-usal-light {
+  background-color: var(--usal-bg-light);
+}
+
+.bg-usal-yellow-light {
+  background-color: var(--usal-bg-yellow);
+}
+
+.bg-usal-red-light {
+  background-color: var(--usal-bg-red);
+}
+
+/* Efectos hover con colores USAL */
+.hover-usal-green:hover {
+  background-color: var(--usal-green);
+  color: white;
+}
+
+.hover-usal-yellow:hover {
+  background-color: var(--usal-yellow);
+  color: white;
+}
+
+.hover-usal-red:hover {
+  background-color: var(--usal-red);
+  color: white;
+}
+
+/* Sombras con colores USAL */
+.shadow-usal-green {
+  box-shadow: 0 4px 14px 0 rgba(34, 197, 94, 0.2);
+}
+
+.shadow-usal-yellow {
+  box-shadow: 0 4px 14px 0 rgba(251, 191, 36, 0.2);
+}
+
+.shadow-usal-red {
+  box-shadow: 0 4px 14px 0 rgba(239, 68, 68, 0.2);
+}
