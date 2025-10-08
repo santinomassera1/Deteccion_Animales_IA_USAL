@@ -47,12 +47,17 @@ cover/
 
 # Environments
 .env
+.env.local
 .venv
 env/
 venv/
 ENV/
 env.bak/
 venv.bak/
+
+# Flask
+instance/
+.webassets-cache
 
 # VS Code
 .vscode/
@@ -75,13 +80,29 @@ yarn-error.log*
 lerna-debug.log*
 .pnpm-debug.log*
 
-# Frontend build
+# Node.js / React Native / Expo - Mobile
+mobile/node_modules/
+mobile/.expo/
+mobile/.expo-shared/
+mobile/npm-debug.log*
+mobile/yarn-debug.log*
+mobile/yarn-error.log*
+mobile/package-lock.json
+mobile/dist/
+mobile/build/
+
+# Frontend
+frontend/node_modules/
 frontend/dist/
 frontend/build/
+frontend/.cache/
+frontend/package-lock.json
 
 # Logs
 *.log
 logs/
+backend.log
+mobile.log
 
 # Runtime data
 pids
@@ -95,12 +116,19 @@ frontend/runs/
 
 # Uploads and processed files
 uploads/
+uploads/*
+!uploads/.gitkeep
 frontend/uploads/
 processed_*.mp4
 *.mp4.tmp
 
 # Dataset cache files
 *.cache
+
+# Datasets
+DataSet_Veterinaria/
+dataset/
+data/
 
 # macOS
 .DS_Store
@@ -119,6 +147,7 @@ $RECYCLE.BIN/
 
 # Model weights - Configuración inteligente
 # Permitir README.md en carpeta models pero ignorar archivos .pt grandes
+*.pt
 models/*.pt
 !models/README.md
 
@@ -131,8 +160,15 @@ models/*.pt
 *.tmp
 *.temp
 *.zip
+video_processing_status.json
 
 # Debug files
 *debug.log
 debug_*.py
 test_*.py
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
