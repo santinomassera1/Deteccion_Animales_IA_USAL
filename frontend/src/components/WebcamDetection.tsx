@@ -49,16 +49,16 @@ const WebcamDetection = () => {
       if (streamImageRef.current) {
           console.log('📡 Configurando stream URL:', apiService.getWebcamStreamUrl());
           
-          // Configurar optimizaciones MÁXIMAS para fluidez
+          // Configuraciones optimizadas para velocidad
           const img = streamImageRef.current;
-          img.style.imageRendering = 'pixelated';    // Render más rápido para video en tiempo real
+          img.style.imageRendering = 'auto';      // Renderizado estándar rápido
           img.style.backfaceVisibility = 'hidden';
           img.style.transform = 'translateZ(0)';
-          img.style.willChange = 'transform';        // Optimización GPU
-          img.style.filter = 'contrast(1.1)';       // Mejorar contraste para compensar compresión
+          img.style.willChange = 'transform';      // Optimización GPU básica
+          img.style.filter = 'none';               // Sin filtros para máxima velocidad
           
-          // Set source con parámetros anti-cache para mejor streaming
-          const streamUrl = apiService.getWebcamStreamUrl() + '?t=' + Date.now();
+          // Set source optimizado para velocidad
+          const streamUrl = apiService.getWebcamStreamUrl() + '?speed=1&t=' + Date.now();
           img.src = streamUrl;
         
         img.onload = () => {
@@ -159,10 +159,10 @@ const WebcamDetection = () => {
   };
 
 
-  // Effect para polling de detecciones en streaming
+  // Effect para polling de detecciones - OPTIMIZADO PARA VELOCIDAD
   useEffect(() => {
     if (webcamActive && isStreamConnected) {
-      detectionIntervalRef.current = setInterval(fetchStreamingDetections, 3000);
+      detectionIntervalRef.current = setInterval(fetchStreamingDetections, 2000); // Cada 2 segundos para velocidad
       return () => {
         if (detectionIntervalRef.current) {
           clearInterval(detectionIntervalRef.current);
@@ -296,12 +296,12 @@ const WebcamDetection = () => {
                   alt="Streaming de cámara con detecciones"
                   className="w-full h-auto rounded-lg shadow-sm bg-gray-100"
                   style={{ 
-                    minHeight: '300px',
-                    imageRendering: 'pixelated',        // Render optimizado para video
+                    minHeight: '480px',  // Altura ajustada para resolución equilibrada
+                    maxHeight: '600px',  // Altura máxima razonable
+                    imageRendering: 'auto',             // Renderizado estándar
                     backfaceVisibility: 'hidden',
-                    transform: 'translateZ(0)',         // Aceleración GPU
-                    willChange: 'transform',            // Optimización de animación
-                    filter: 'contrast(1.1)'            // Mejorar contraste
+                    transform: 'translateZ(0)',         // Aceleración GPU básica
+                    willChange: 'transform'             // Optimización GPU básica
                   }}
                 />
                   {isStreamConnected && (
