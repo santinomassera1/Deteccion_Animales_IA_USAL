@@ -2,7 +2,7 @@ import axios from 'axios';
 
 // IMPORTANTE: Cambia esta IP por la IP local de tu Mac
 // Para obtenerla: ejecuta "ifconfig | grep 'inet ' | grep -v 127.0.0.1" en tu Mac
-const API_BASE_URL = 'http://192.168.0.6:5003'; // ← IP configurada automáticamente
+const API_BASE_URL = 'http://172.16.132.152:5003'; // ← IP configurada automáticamente
 
 const api = axios.create({
   baseURL: API_BASE_URL,
