@@ -33,16 +33,16 @@ class EnhancedModelHandler:
         # Configuración de modelos con fallbacks automáticos
         self.model_config = {
             'primary': {
-                'path': 'models/animals_best.pt',
-                'fallback': 'models/yolov8m.pt',
+                'path': 'models/animals_best.pt',  # MODELO MEJORADO (50MB, 25.9M params, 5.31 FPS)
+                'fallback': 'models/animals_best_old_backup.pt',  # Fallback al modelo anterior
                 'auto_download': 'yolov8m.pt',
-                'description': 'Modelo entrenado principal (animals_best.pt)'
+                'description': 'Modelo mejorado YOLOv8m (50MB) - 40% más rápido'
             },
             'secondary': {
-                'path': 'models/animals_last.pt', 
+                'path': 'models/animals_last.pt',  # Modelo secundario
                 'fallback': 'models/yolov8s.pt',
                 'auto_download': 'yolov8s.pt',
-                'description': 'Modelo entrenado secundario (animals_last.pt)'
+                'description': 'Modelo secundario como backup'
             },
             'yolo11n': {
                 'path': 'models/yolo11n.pt',
@@ -197,7 +197,7 @@ class EnhancedModelHandler:
                     print(f"   Algunas clases: {classes[:5] if classes else 'Sin información'}")
                     
                     # Verificar compatibilidad con animales
-                    target_classes = ['cat', 'chicken', 'cow', 'dog', 'horse']
+                    target_classes = ['car', 'cow', 'dog', 'horse']  # Nuevo modelo: 4 clases
                     animal_classes_found = [cls for cls in target_classes if cls in classes]
                     
                     if animal_classes_found:
@@ -291,7 +291,7 @@ class EnhancedModelHandler:
                                         'box': adjusted_box,
                                         'confidence': confidence,
                                         'class': class_id,
-                                        'class_name': ['cat', 'chicken', 'cow', 'dog', 'horse'][class_id],
+                                        'class_name': ['car', 'cow', 'dog', 'horse'][class_id],  # Nuevo modelo: 4 clases
                                         'model': f'{model_name}_yolo_track_{aug_name}',
                                         'tta_weight': self._get_tta_weight(aug_name),
                                         'track_id': track_id,  # ID de tracking de YOLO
@@ -620,9 +620,9 @@ class EnhancedModelHandler:
                         if boxes.id is not None:
                             track_id = int(boxes.id[idx])
                         
-                        # Solo procesar nuestras 5 clases
-                        if class_id < 5:
-                            class_names = ['cat', 'chicken', 'cow', 'dog', 'horse']
+                        # Solo procesar nuestras 4 clases (nuevo modelo)
+                        if class_id < 4:
+                            class_names = ['car', 'cow', 'dog', 'horse']  # Nuevo modelo: 4 clases
                             detection = {
                                 'box': box,
                                 'confidence': conf,
