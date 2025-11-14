@@ -4,9 +4,11 @@ import {
   CameraIcon, 
   StopIcon,
   PlayIcon,
-  ChartBarIcon,
   ArrowPathIcon,
-  ExclamationTriangleIcon
+  ExclamationTriangleIcon,
+  XMarkIcon,
+  ChevronRightIcon,
+  BellIcon
 } from '@heroicons/react/24/outline';
 import { useAppStore } from '../store/useAppStore';
 import { apiService } from '../services/api';
@@ -15,7 +17,6 @@ const WebcamDetection = () => {
   const { 
     webcamActive, 
     setWebcamActive, 
-    webcamDetections, 
     setWebcamDetections,
     isLoading,
     setIsLoading,
@@ -30,7 +31,14 @@ const WebcamDetection = () => {
   const [streamError, setStreamError] = useState<string | null>(null);
   const [recentDetections, setRecentDetections] = useState<any[]>([]);
   const [isStreamConnected, setIsStreamConnected] = useState(false);
-
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [toastNotifications, setToastNotifications] = useState<Array<{
+    id: string;
+    class: string;
+    confidence: number;
+    timestamp: number;
+  }>>([]);
+  const [previousDetectionsCount, setPreviousDetectionsCount] = useState(0);
 
   // Función para iniciar streaming continuo del backend
   const startWebcam = async () => {
@@ -126,6 +134,8 @@ const WebcamDetection = () => {
       setIsStreamConnected(false);
       setRecentDetections([]);
       setWebcamDetections([]);
+      setToastNotifications([]);
+      setPreviousDetectionsCount(0);
       
       console.log('✅ Cámara detenida completamente');
       addNotification({
@@ -150,8 +160,30 @@ const WebcamDetection = () => {
     try {
       const result = await apiService.getWebcamDetections();
       if (result.detections && result.detections.length > 0) {
-        setRecentDetections(result.detections);
-        setWebcamDetections(result.detections);
+        const newDetections = result.detections;
+        setRecentDetections(newDetections);
+        setWebcamDetections(newDetections);
+        
+        // Detectar nuevas detecciones para mostrar toasts
+        if (newDetections.length > previousDetectionsCount) {
+          const newOnes = newDetections.slice(previousDetectionsCount);
+          newOnes.forEach((det: any) => {
+            const toastId = `${det.timestamp || Date.now()}-${Math.random()}`;
+            setToastNotifications(prev => [...prev, {
+              id: toastId,
+              class: det.class || det.class_name || 'unknown',
+              confidence: det.confidence || 0,
+              timestamp: det.timestamp || Date.now() / 1000
+            }]);
+            
+            // Auto-remove toast after 4 seconds
+            setTimeout(() => {
+              setToastNotifications(prev => prev.filter(t => t.id !== toastId));
+            }, 4000);
+          });
+        }
+        
+        setPreviousDetectionsCount(newDetections.length);
       }
     } catch (error) {
       console.error('Error fetching streaming detections:', error);
@@ -169,7 +201,7 @@ const WebcamDetection = () => {
         }
       };
     }
-  }, [webcamActive, isStreamConnected]);
+  }, [webcamActive, isStreamConnected, previousDetectionsCount]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -185,12 +217,42 @@ const WebcamDetection = () => {
       cow: '#22c55e',      // Verde
       dog: '#3b82f6',      // Azul
       horse: '#facc15',    // Amarillo brillante (más visible)
+      auto: '#a855f7',     // Púrpura para autos
+      car: '#a855f7',
+      caballo: '#facc15',
+      perro: '#3b82f6',
+      vaca: '#22c55e',
     };
-    return colors[animalClass] || '#6b7280';
+    return colors[animalClass?.toLowerCase()] || '#6b7280';
   };
 
+  const getAnimalName = (animalClass: string): string => {
+    const names: Record<string, string> = {
+      cat: 'Gato',
+      chicken: 'Gallina',
+      cow: 'Vaca',
+      dog: 'Perro',
+      horse: 'Caballo',
+      auto: 'Auto',
+      car: 'Auto',
+      caballo: 'Caballo',
+      perro: 'Perro',
+      vaca: 'Vaca',
+    };
+    return names[animalClass?.toLowerCase()] || animalClass;
+  };
+
+  // Estadísticas rápidas
+  const detectionStats = recentDetections.reduce((acc, det: any) => {
+    const className = (det.class || det.class_name || 'unknown').toLowerCase();
+    acc[className] = (acc[className] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
+
+  const totalDetections = recentDetections.length;
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 relative">
       {/* Header */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
@@ -278,7 +340,7 @@ const WebcamDetection = () => {
         )}
       </motion.div>
 
-      {/* Webcam Display */}
+      {/* Webcam Display with Overlay Stats */}
       <AnimatePresence>
         {webcamActive && (
         <motion.div
@@ -286,7 +348,7 @@ const WebcamDetection = () => {
           animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
           transition={{ duration: 0.5 }}
-            className="bg-white rounded-xl shadow-sm border border-gray-200 p-6"
+            className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 relative"
         >
           <div className="relative">
             {/* Streaming mode */}
@@ -296,19 +358,54 @@ const WebcamDetection = () => {
                   alt="Streaming de cámara con detecciones"
                   className="w-full h-auto rounded-lg shadow-sm bg-gray-100"
                   style={{ 
-                    minHeight: '480px',  // Altura ajustada para resolución equilibrada
-                    maxHeight: '600px',  // Altura máxima razonable
-                    imageRendering: 'auto',             // Renderizado estándar
+                    minHeight: '480px',
+                    maxHeight: '600px',
+                    imageRendering: 'auto',
                     backfaceVisibility: 'hidden',
-                    transform: 'translateZ(0)',         // Aceleración GPU básica
-                    willChange: 'transform'             // Optimización GPU básica
+                    transform: 'translateZ(0)',
+                    willChange: 'transform'
                   }}
                 />
+                  
+                  {/* Live indicator */}
                   {isStreamConnected && (
-                    <div className="absolute top-4 right-4 bg-green-400 text-white px-3 py-1 rounded-full text-sm font-medium flex items-center">
+                    <div className="absolute top-4 right-4 bg-green-400 text-white px-3 py-1 rounded-full text-sm font-medium flex items-center z-10">
                       <div className="w-2 h-2 bg-white rounded-full mr-2 animate-pulse"></div>
                       En vivo
                     </div>
+                  )}
+
+                  {/* Floating Stats Badge */}
+                  {isStreamConnected && totalDetections > 0 && (
+                    <motion.div
+                      initial={{ opacity: 0, scale: 0.8 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      className="absolute bottom-4 left-4 bg-white/95 backdrop-blur-sm rounded-lg shadow-lg p-3 border border-gray-200 z-10"
+                    >
+                      <div className="flex items-center space-x-2 mb-2">
+                        <BellIcon className="w-4 h-4 text-gray-600" />
+                        <span className="text-sm font-semibold text-gray-900">
+                          {totalDetections} detección{totalDetections !== 1 ? 'es' : ''}
+                        </span>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                      {Object.entries(detectionStats).slice(0, 3).map(([animal, count]) => (
+                        <div
+                          key={animal}
+                          className="flex items-center space-x-1 px-2 py-1 rounded-full text-xs font-medium text-white"
+                          style={{ backgroundColor: getAnimalColor(animal) }}
+                        >
+                          <span>{getAnimalName(animal)}</span>
+                          <span className="bg-white/30 rounded-full px-1.5">{count as number}</span>
+                        </div>
+                      ))}
+                        {Object.keys(detectionStats).length > 3 && (
+                          <div className="px-2 py-1 rounded-full text-xs font-medium bg-gray-200 text-gray-700">
+                            +{Object.keys(detectionStats).length - 3}
+                          </div>
+                        )}
+                      </div>
+                    </motion.div>
                   )}
               
               {/* Instructions overlay when not connected */}
@@ -327,94 +424,174 @@ const WebcamDetection = () => {
       )}
       </AnimatePresence>
 
-      {/* Detection Results */}
-      {recentDetections.length > 0 && (
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-          className="space-y-6"
-        >
-          {/* Results Header */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-              <div>
-                <h4 className="text-lg font-semibold text-gray-900">
-                Detecciones en vivo
-                </h4>
-                <p className="text-sm text-gray-600">
-                {recentDetections.length} detecciones en los últimos 30 segundos
-              </p>
-            </div>
-          </div>
-
-          {/* Detection Details */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-            <h5 className="text-md font-semibold text-gray-900 mb-4">
-              Detalles de las detecciones
-            </h5>
-            <div className="space-y-3">
-              {recentDetections?.map((detection: any, index: number) => (
+      {/* Toast Notifications - Top Right */}
+      <div className="fixed top-20 right-4 z-50 space-y-2 pointer-events-none">
+        <AnimatePresence>
+          {toastNotifications.map((toast) => (
+            <motion.div
+              key={toast.id}
+              initial={{ opacity: 0, x: 100, scale: 0.8 }}
+              animate={{ opacity: 1, x: 0, scale: 1 }}
+              exit={{ opacity: 0, x: 100, scale: 0.8 }}
+              transition={{ duration: 0.3 }}
+              className="pointer-events-auto bg-white rounded-lg shadow-xl border border-gray-200 p-4 min-w-[280px] max-w-[320px]"
+            >
+              <div className="flex items-start space-x-3">
                 <div
-                  key={index}
-                  className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
-                >
-                  <div className="flex items-center space-x-3">
-                    <div
-                      className="w-4 h-4 rounded-full"
-                      style={{ backgroundColor: getAnimalColor((detection as any).class || (detection as any).class_name) }}
-                    ></div>
-                    <span className="font-medium text-gray-900 capitalize">
-                      {(detection as any).class || (detection as any).class_name}
-                    </span>
-                    {detection.timestamp && (
-                      <span className="text-xs text-gray-500">
-                        {new Date(detection.timestamp * 1000).toLocaleTimeString()}
-                      </span>
-                    )}
+                  className="w-3 h-3 rounded-full mt-1 flex-shrink-0"
+                  style={{ backgroundColor: getAnimalColor(toast.class) }}
+                ></div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-semibold text-gray-900 capitalize">
+                      {getAnimalName(toast.class)} detectado
+                    </p>
+                    <button
+                      onClick={() => setToastNotifications(prev => prev.filter(t => t.id !== toast.id))}
+                      className="text-gray-400 hover:text-gray-600 flex-shrink-0 ml-2"
+                    >
+                      <XMarkIcon className="w-4 h-4" />
+                    </button>
                   </div>
-                  <div className="text-sm text-gray-600">
-                    {Math.round((detection.confidence || 0) * 100)}% confianza
-                  </div>
+                  <p className="text-xs text-gray-500 mt-1">
+                    {Math.round(toast.confidence * 100)}% de confianza
+                  </p>
                 </div>
-              ))}
-            </div>
-          </div>
-        </motion.div>
-      )}
+              </div>
+            </motion.div>
+          ))}
+        </AnimatePresence>
+      </div>
 
-      {/* Recent Detections Summary */}
-      {webcamDetections.length > 0 && (
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-          className="bg-white rounded-xl shadow-sm border border-gray-200 p-6"
-        >
-          <div className="flex items-center space-x-2 mb-4">
-            <ChartBarIcon className="w-5 h-5 text-green-500" />
-            <h5 className="text-md font-semibold text-gray-900">
-              Resumen de detecciones
-            </h5>
-          </div>
-          
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-            {['cat', 'chicken', 'cow', 'dog', 'horse'].map((animal) => {
-              const count = webcamDetections.filter(d => ((d as any).class || (d as any).class_name) === animal).length;
-              return (
-                <div key={animal} className="text-center">
-                  <div
-                    className="w-12 h-12 rounded-full mx-auto mb-2 flex items-center justify-center text-white font-bold"
-                    style={{ backgroundColor: getAnimalColor(animal) }}
-                  >
-                    {count}
-                  </div>
-                  <p className="text-xs text-gray-600 capitalize">{animal}</p>
+      {/* Sidebar de Detecciones - Deslizable desde la derecha */}
+      <AnimatePresence>
+        {webcamActive && (
+          <>
+            {/* Toggle Button */}
+            <motion.button
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 20 }}
+              onClick={() => setSidebarOpen(!sidebarOpen)}
+              className={`fixed right-0 top-1/2 -translate-y-1/2 z-40 bg-white rounded-l-lg shadow-lg border border-r-0 border-gray-200 p-3 transition-all duration-300 ${
+                sidebarOpen ? 'translate-x-0' : 'translate-x-full'
+              }`}
+            >
+              {sidebarOpen ? (
+                <ChevronRightIcon className="w-5 h-5 text-gray-600" />
+              ) : (
+                <div className="relative">
+                  <BellIcon className="w-5 h-5 text-gray-600" />
+                  {totalDetections > 0 && (
+                    <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold">
+                      {totalDetections > 9 ? '9+' : totalDetections}
+                    </span>
+                  )}
                 </div>
-              );
-            })}
-          </div>
-        </motion.div>
-      )}
+              )}
+            </motion.button>
+
+            {/* Sidebar Panel */}
+            <motion.div
+              initial={{ x: '100%' }}
+              animate={{ x: sidebarOpen ? 0 : '100%' }}
+              exit={{ x: '100%' }}
+              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+              className="fixed right-0 top-0 h-full w-96 bg-white shadow-2xl z-50 border-l border-gray-200 overflow-hidden"
+            >
+              <div className="h-full flex flex-col">
+                {/* Header */}
+                <div className="bg-gradient-to-r from-primary-600 to-primary-700 text-white p-6 flex items-center justify-between">
+                  <div>
+                    <h3 className="text-lg font-semibold">Detecciones en Vivo</h3>
+                    <p className="text-sm text-primary-100 mt-1">
+                      {totalDetections} detección{totalDetections !== 1 ? 'es' : ''} recientes
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setSidebarOpen(false)}
+                    className="text-white hover:text-primary-100 transition-colors"
+                  >
+                    <XMarkIcon className="w-6 h-6" />
+                  </button>
+                </div>
+
+                {/* Stats Summary */}
+                {Object.keys(detectionStats).length > 0 && (
+                  <div className="p-4 bg-gray-50 border-b border-gray-200">
+                    <div className="grid grid-cols-2 gap-2">
+                      {Object.entries(detectionStats).map(([animal, count]) => (
+                        <div
+                          key={animal}
+                          className="flex items-center space-x-2 p-2 bg-white rounded-lg"
+                        >
+                          <div
+                            className="w-3 h-3 rounded-full"
+                            style={{ backgroundColor: getAnimalColor(animal) }}
+                          ></div>
+                          <span className="text-sm font-medium text-gray-700 capitalize flex-1">
+                            {getAnimalName(animal)}
+                          </span>
+                          <span className="text-sm font-bold text-gray-900">{count as number}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Detections List */}
+                <div className="flex-1 overflow-y-auto p-4">
+                  {recentDetections.length === 0 ? (
+                    <div className="text-center py-12 text-gray-500">
+                      <BellIcon className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                      <p className="text-sm">Aún no hay detecciones</p>
+                      <p className="text-xs mt-1">Las detecciones aparecerán aquí</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {recentDetections.slice().reverse().map((detection: any, index: number) => (
+                        <motion.div
+                          key={`${detection.timestamp || index}-${index}`}
+                          initial={{ opacity: 0, x: 20 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ delay: index * 0.05 }}
+                          className="bg-white rounded-lg border border-gray-200 p-4 hover:shadow-md transition-shadow"
+                        >
+                          <div className="flex items-start justify-between">
+                            <div className="flex items-start space-x-3 flex-1">
+                              <div
+                                className="w-4 h-4 rounded-full mt-1 flex-shrink-0"
+                                style={{ backgroundColor: getAnimalColor(detection.class || detection.class_name) }}
+                              ></div>
+                              <div className="flex-1 min-w-0">
+                                <p className="font-semibold text-gray-900 capitalize text-sm">
+                                  {getAnimalName(detection.class || detection.class_name)}
+                                </p>
+                                <p className="text-xs text-gray-500 mt-1">
+                                  {detection.timestamp 
+                                    ? new Date(detection.timestamp * 1000).toLocaleTimeString()
+                                    : 'Ahora'
+                                  }
+                                </p>
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-sm font-semibold text-gray-700">
+                                {Math.round((detection.confidence || 0) * 100)}%
+                              </p>
+                              <p className="text-xs text-gray-400">confianza</p>
+                            </div>
+                          </div>
+                        </motion.div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
