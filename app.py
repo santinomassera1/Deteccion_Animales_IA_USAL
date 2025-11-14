@@ -17,8 +17,8 @@ from flask_cors import CORS
 from werkzeug.utils import secure_filename
 from ultralytics import YOLO
 from config import Config
-from person_detector import PersonDetector
 from enhanced_model_handler import EnhancedModelHandler
+from video_report import VideoReportBuilder
 # Ya no necesitamos el detection_stabilizer custom - usamos tracking nativo de YOLO
 # from detection_stabilizer import DetectionStabilizer, get_enhanced_drawing_style
 
@@ -26,7 +26,6 @@ app = Flask(__name__)
 CORS(app)  # Enable CORS for all routes
 
 # Configuración de la aplicación
-app.config['SECRET_KEY'] = Config.SECRET_KEY
 app.config['UPLOAD_FOLDER'] = Config.UPLOAD_FOLDER
 app.config['MAX_CONTENT_LENGTH'] = Config.MAX_CONTENT_LENGTH
 app.config['MAX_IMAGE_SIZE'] = Config.MAX_IMAGE_SIZE
@@ -38,14 +37,13 @@ app.config['ALLOWED_VIDEO_EXTENSIONS'] = Config.ALLOWED_VIDEO_EXTENSIONS
 # Crear directorio de uploads si no existe
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
-# Modelos del ensemble
-models = {}
+# Modelo único animals_best.pt
 model_loaded = False
 person_detector = None
 video_processing_status = {}  # Estado de procesamiento de videos
 STATUS_FILE = 'video_processing_status.json'  # Archivo para persistir el estado
 
-# Handler mejorado para modelos
+# Handler para modelo único
 enhanced_handler = None
 
 # Ahora usamos tracking nativo de YOLO integrado en enhanced_handler
@@ -72,71 +70,51 @@ def load_video_status():
         video_processing_status = {}
 
 def load_models():
-    """Carga el sistema mejorado con ensemble TTA + YOLO Tracking para detección de 5 animales"""
-    global models, model_loaded, person_detector, enhanced_handler
+    """Carga el modelo especializado yolov8n.pt con filtros COCO + TTA + YOLO Tracking"""
+    global model_loaded, person_detector, enhanced_handler
     
     try:
-        print("Cargando sistema mejorado con Ensemble TTA...")
+        print("Cargando modelo bestnov.pt (entrenado) o fallback a yolov8n.pt...")
         
-        # Cargar handler mejorado
+        # Cargar handler con modelo (entrenado o COCO)
         enhanced_handler = EnhancedModelHandler()
         if enhanced_handler.load_models():
             model_loaded = True
             
-            # También mantener compatibilidad con el sistema anterior
-            models['enhanced'] = enhanced_handler
+            # Nota: PersonDetector removido - no se usa en el sistema actual
+            # if enhanced_handler.model:
+            #     person_detector = PersonDetector(nacho_model=enhanced_handler.model)
+            #     print("Detector de personas cargado")
             
-            # Cargar detector de personas usando uno de los modelos cargados
-            if enhanced_handler.models:
-                primary_model = list(enhanced_handler.models.values())[0]
-                person_detector = PersonDetector(nacho_model=primary_model)
-                print("Detector de personas cargado con modelo principal")
-            
-            print("Sistema mejorado cargado exitosamente!")
-            print("   🚀 NUEVO MODELO YOLOv8m (50MB) - 40% MÁS RÁPIDO")
-            print("   Ensemble TTA - Máxima precisión con múltiples modelos")
-            print("   Test Time Augmentation - Múltiples vistas por imagen")
-            print("   🧠 Weighted Ensemble - Combinación inteligente de predicciones")
-            print("   Post-procesamiento avanzado - Filtros específicos por clase")
-            print("   - Autos/Gatos: Ultra alta precisión con ensemble")
-            print("   - Vacas: Ultra alta precisión con ensemble")
-            print("   - Perros: Ultra alta precisión con ensemble")
-            print("   - Caballos: Ultra alta precisión con ensemble")
-            print("   - Personas: Detectadas para evitar falsos positivos")
+            print("✅ Sistema cargado exitosamente!")
+            if enhanced_handler.is_trained_model:
+                print("   🚀 Modelo: bestnov.pt (entrenado)")
+                print(f"   🎯 Clases: {', '.join(sorted(enhanced_handler.model_class_list))}")
+            else:
+                print("   🚀 Modelo: yolov8n.pt (COCO specialized)")
+                print("   🎯 Clases COCO: car(2), cow(19), horse(17), dog(16)")
+            print("   📊 Test Time Augmentation - Múltiples vistas por imagen")
+            print("   🎯 Post-procesamiento avanzado - Filtros específicos por clase")
+            print("   - Autos: Alta precisión")
+            print("   - Vacas: Alta precisión")
+            print("   - Perros: Alta precisión")
+            print("   - Caballos: Alta precisión")
             
             print("Sistema de tracking YOLO nativo activado - Elimina flickering profesional")
-            print("   - ByteTrack integrado en cada modelo")
+            print("   - ByteTrack integrado")
             print("   - Tracking IDs persistentes entre frames")
             print("   - Eliminación automática de parpadeo")
-            print("   - Asociación robusta de objetos")
             
             return True
         else:
-            raise Exception("No se pudieron cargar los modelos del ensemble")
+            raise Exception("No se pudo cargar el modelo")
             
     except Exception as e:
-        print(f"Error cargando sistema mejorado: {e}")
-        print("Intentando fallback al sistema anterior...")
-        
-        # Fallback al sistema anterior
-        try:
-            import torch
-            original_load = torch.load
-            
-            def patched_load(*args, **kwargs):
-                kwargs['weights_only'] = False
-                return original_load(*args, **kwargs)
-            
-            torch.load = patched_load
-            
-            models['cuda_model'] = YOLO('Entrenamiento vet con cuda/runs/animals_training_m/weights/best.pt')
-            person_detector = PersonDetector(nacho_model=models['cuda_model'])
-            model_loaded = True
-            print("Sistema fallback cargado (modelo único)")
-            
-        except Exception as fallback_error:
-            print(f"Error también en fallback: {fallback_error}")
-            model_loaded = False
+        print(f"❌ Error cargando modelo: {e}")
+        import traceback
+        traceback.print_exc()
+        model_loaded = False
+        return False
 
 def preprocess_image_for_detection(image):
     """Preprocesa la imagen para mejorar la detección"""
@@ -236,7 +214,7 @@ def combine_multiple_predictions(results_list):
                     'box': box.xyxy[0].cpu().numpy().tolist(),
                     'confidence': confidence,
                     'class': class_id,
-                    'class_name': ['car', 'cow', 'dog', 'horse'][class_id] if class_id < 4 else 'unknown',  # Nuevo modelo: 4 clases
+                    'class_name': enhanced_handler.model_class_names.get(class_id, f'class_{class_id}') if enhanced_handler and enhanced_handler.model_class_names else f'class_{class_id}',
                     'model': 'cuda_yolov8m'
                 }
                 all_detections.append(detection)
@@ -267,95 +245,52 @@ def combine_multiple_predictions(results_list):
     
     return []
 
-def ensemble_predict(image, confidence_threshold):
-    """Predice usando el sistema mejorado con Ensemble TTA + Tracking nativo de YOLO"""
+def ensemble_predict(image, confidence_threshold=None, use_tta=True):
+    """
+    Predicción para imágenes estáticas (offline).
+    Usa TTA opcionalmente según configuración.
+    NO usa tracking (solo para imágenes estáticas).
+    """
     global enhanced_handler
     
     try:
-        # Usar sistema mejorado si está disponible
+        # Usar modelo único si está disponible
         if enhanced_handler and model_loaded:
-            print(f"Usando sistema Ensemble TTA + YOLO Tracking (threshold: {confidence_threshold})")
-            detections = enhanced_handler.predict_with_tta(image, confidence_threshold)
+            # Usar threshold de configuración si no se especifica
+            if confidence_threshold is None:
+                confidence_threshold = Config.IMAGE_CONFIDENCE_THRESHOLD
+            
+            # Determinar si usar TTA
+            use_tta_final = use_tta and Config.IMAGE_USE_TTA
+            
+            if use_tta_final:
+                print(f"📸 Imagen estática con TTA (threshold: {confidence_threshold})")
+            else:
+                print(f"📸 Imagen estática sin TTA (threshold: {confidence_threshold})")
+            
+            detections = enhanced_handler.predict_single_image(image, use_tta=use_tta_final)
             
             if detections:
-                print(f"Ensemble TTA + Tracking completado: {len(detections)} detecciones")
+                print(f"✅ Detección completada: {len(detections)} objetos")
                 
                 for i, det in enumerate(detections):
-                    track_info = ""
-                    if det.get('track_id') is not None:
-                        track_info = f" [ID:{det['track_id']}]"
-                    
-                    ensemble_info = f" (ensemble: {det.get('ensemble_size', 'N/A')})" if 'ensemble_size' in det else ""
-                    
-                    print(f"   - {i+1}. {det['class_name']} ({det['confidence']:.3f}){track_info}{ensemble_info}")
+                    print(f"   - {i+1}. {det['class_name']} ({det['confidence']:.3f})")
                 
                 return detections
             else:
-                print("Ensemble TTA + Tracking no encontró detecciones")
+                print("ℹ️  No se encontraron detecciones")
                 return []
-        
-        # Fallback al sistema anterior si no hay enhanced_handler
-        elif 'cuda_model' in models:
-            print(f"Usando sistema fallback (threshold: {confidence_threshold})")
-            return _legacy_predict(image, confidence_threshold)
         else:
-            print("No hay modelos disponibles")
+            print("❌ No hay modelo disponible")
             return []
             
     except Exception as e:
-        print(f"Error en ensemble_predict: {e}")
-        # Intentar fallback
-        if 'cuda_model' in models:
-            print("Intentando fallback después de error...")
-            return _legacy_predict(image, confidence_threshold)
+        print(f"❌ Error en predicción: {e}")
+        import traceback
+        traceback.print_exc()
         return []
 
-def _legacy_predict(image, confidence_threshold):
-    """Predicción fallback con el sistema anterior"""
-    try:
-        all_detections = []
-        
-        # Redimensionar imagen si es muy grande
-        height, width = image.shape[:2]
-        if width > 640 or height > 480:
-            scale = min(640/width, 480/height)
-            new_width = int(width * scale)
-            new_height = int(height * scale)
-            image = cv2.resize(image, (new_width, new_height))
-        
-        # Preprocesamiento
-        processed_image = preprocess_image_for_detection(image)
-        
-        # Predicción con modelo CUDA
-        results = models['cuda_model'](processed_image, conf=confidence_threshold, verbose=False, 
-                                     imgsz=640, device='cpu', half=False)
-        
-        # Procesar resultados
-        for result in [results]:
-            if result[0].boxes is not None:
-                for box in result[0].boxes:
-                    class_id = int(box.cls[0])
-                    confidence = float(box.conf[0])
-                    
-                    if class_id < 4:  # Solo nuestras 4 clases (nuevo modelo)
-                        detection = {
-                            'box': box.xyxy[0].cpu().numpy().tolist(),
-                            'confidence': confidence,
-                            'class': class_id,
-                            'class_name': ['car', 'cow', 'dog', 'horse'][class_id],  # Nuevo modelo: 4 clases
-                            'model': 'cuda_yolov8m_legacy'
-                        }
-                        all_detections.append(detection)
-        
-        # Filtrado básico
-        final_detections = combine_detections(all_detections, confidence_threshold)
-        
-        print(f"Predicción legacy completada: {len(final_detections)} detecciones")
-        return final_detections
-        
-    except Exception as e:
-        print(f"Error en predicción legacy: {e}")
-        return []
+# Función legacy removida - ya no se usa con el nuevo sistema de modelos especializados
 
 def correct_class_confusion(detection):
     """Corrige confusiones comunes entre clases similares - NUEVO MODELO"""
@@ -366,23 +301,33 @@ def correct_class_confusion(detection):
     height = y2 - y1
     aspect_ratio = width / height
     
-    # Nuevo modelo: car, cow, dog, horse
     # Corrección conservadora solo en casos extremos
-    if class_name == 'car' and confidence < 0.6:
+    # Soporta nombres en español (Auto, Caballo, Perro, Vaca) e inglés (car, cow, dog, horse)
+    class_lower = class_name.lower()
+    
+    if class_lower in ['car', 'auto'] and confidence < 0.6:
         # Si es muy grande, podría ser un caballo o vaca
         area = width * height
         if area > 30000:
-            detection['class_name'] = 'horse'
+            # Intentar mantener el idioma original
+            if class_name == 'Auto':
+                detection['class_name'] = 'Caballo'
+            else:
+                detection['class_name'] = 'horse'
             detection['confidence'] = confidence * 0.9
-            print(f"Corrección conservadora: car -> horse (área muy grande: {area})")
+            print(f"Corrección conservadora: {class_name} -> {detection['class_name']} (área muy grande: {area})")
     
-    elif class_name == 'dog' and confidence < 0.6:
-        # Si es muy pequeño, podría ser un auto/gato
+    elif class_lower in ['dog', 'perro'] and confidence < 0.6:
+        # Si es muy pequeño, podría ser un auto
         area = width * height
         if area < 3000:
-            detection['class_name'] = 'car'
+            # Intentar mantener el idioma original
+            if class_name == 'Perro':
+                detection['class_name'] = 'Auto'
+            else:
+                detection['class_name'] = 'car'
             detection['confidence'] = confidence * 0.9
-            print(f"Corrección conservadora: dog -> car (área muy pequeña: {area})")
+            print(f"Corrección conservadora: {class_name} -> {detection['class_name']} (área muy pequeña: {area})")
     
     return detection
 
@@ -391,12 +336,18 @@ def combine_detections(detections, confidence_threshold):
     if not detections:
         return []
     
-    # Umbrales específicos por clase para mayor precisión - NUEVO MODELO
+    # Umbrales específicos por clase - Soporta español e inglés
     class_thresholds = {
-        'car': 0.6,      # Autos/Gatos: estricto
-        'cow': 0.6,      # Vacas: estricto
-        'dog': 0.7,      # Perros: muy estricto  
-        'horse': 0.6     # Caballos: estricto
+        # Español
+        'Auto': 0.3, 'auto': 0.3,
+        'Caballo': 0.3, 'caballo': 0.3,
+        'Perro': 0.35, 'perro': 0.35,
+        'Vaca': 0.3, 'vaca': 0.3,
+        # Inglés
+        'car': 0.3,
+        'cow': 0.3,
+        'dog': 0.35,
+        'horse': 0.3
     }
     
     filtered_detections = []
@@ -419,19 +370,19 @@ def combine_detections(detections, confidence_threshold):
         height = y2 - y1
         area = width * height
         
-        # Tamaño mínimo más estricto: 30x30 píxeles
-        if width < 30 or height < 30 or area < 900:
+        # Tamaño mínimo más permisivo: 20x20 píxeles (reducido para detectar objetos más pequeños)
+        if width < 20 or height < 20 or area < 400:
             continue
             
         # Tamaño máximo para evitar detecciones que abarcan toda la imagen
         if width > 500 or height > 400 or area > 150000:
-            # Solo permitir si la confianza es muy alta
-            if confidence < 0.9:
+            # Solo permitir si la confianza es alta (reducido de 0.9 a 0.7)
+            if confidence < 0.7:
                 continue
             
-        # 3. Filtro por ratio de aspecto (evitar formas muy extrañas)
+        # 3. Filtro por ratio de aspecto (evitar formas muy extrañas) - RELAJADO
         aspect_ratio = width / height
-        if aspect_ratio < 0.2 or aspect_ratio > 5.0:  # Muy delgado o muy ancho
+        if aspect_ratio < 0.1 or aspect_ratio > 10.0:  # Más permisivo (antes 0.2-5.0)
             continue
             
         # 4. Filtro por posición (evitar detecciones en bordes extremos)
@@ -439,17 +390,18 @@ def combine_detections(detections, confidence_threshold):
         image_height = 480
         
         # Evitar detecciones que toquen los bordes (posibles falsos positivos)
-        margin = 10
+        # RELAJADO: reducir margen y threshold para no perder detecciones válidas
+        margin = 5  # Reducido de 10 a 5 píxeles
         if (x1 < margin or y1 < margin or 
             x2 > image_width - margin or y2 > image_height - margin):
-            # Solo permitir si la confianza es muy alta
-            if confidence < 0.8:
+            # Solo permitir si la confianza es razonable (reducido de 0.8 a 0.5)
+            if confidence < 0.5:
                 continue
         
         filtered_detections.append(detection)
     
-    # 5. Filtro de supresión no máxima (NMS) para evitar duplicados - MÁS ESTRICTO
-    final_detections = apply_nms(filtered_detections, iou_threshold=0.5)
+    # 5. Filtro de supresión no máxima (NMS) para evitar duplicados - RELAJADO para reducir falsos negativos
+    final_detections = apply_nms(filtered_detections, iou_threshold=0.4)
     
     # 6. Filtro adicional por clase: máximo 2 detecciones por clase para evitar sobre-detección
     class_counts = {}
@@ -462,8 +414,8 @@ def combine_detections(detections, confidence_threshold):
         class_name = detection['class_name']
         class_counts[class_name] = class_counts.get(class_name, 0)
         
-        # Límite por clase (máximo 2 por clase para el nuevo modelo)
-        max_per_class = 2  # Todas las clases tienen el mismo límite
+        # Límite por clase - AUMENTADO para detectar más animales (de 2 a 5)
+        max_per_class = 5  # Permitir más detecciones por clase para reducir falsos negativos
         
         if class_counts[class_name] < max_per_class:
             validated_detections.append(detection)
@@ -570,15 +522,25 @@ def apply_temporal_filter(detections, frame_number):
     return filtered_detections
 
 def get_detection_color(class_name):
-    """Obtiene el color para una clase de detección - BGR format para OpenCV - NUEVO MODELO"""
+    """Obtiene el color para una clase de detección - BGR format para OpenCV"""
+    # Normalizar nombre de clase (case-insensitive)
+    class_lower = class_name.lower() if class_name else ''
+    
     colors = {
-        'car': (255, 0, 255),      # Magenta para autos/gatos (BGR)
-        'cow': (0, 255, 0),        # Verde brillante para vacas (BGR)
-        'dog': (255, 0, 0),        # Azul brillante para perros (BGR)
-        'horse': (0, 255, 255),    # Amarillo brillante para caballos (BGR)
-        'person': (255, 255, 0)    # Cian para personas (BGR)
+        # Español
+        'auto': (255, 0, 255),      # Magenta para autos (BGR)
+        'caballo': (0, 255, 255),   # Amarillo para caballos (BGR)
+        'perro': (255, 0, 0),       # Azul para perros (BGR)
+        'vaca': (0, 255, 0),        # Verde para vacas (BGR)
+        # Inglés
+        'car': (255, 0, 255),       # Magenta para autos (BGR)
+        'horse': (0, 255, 255),     # Amarillo para caballos (BGR)
+        'dog': (255, 0, 0),         # Azul para perros (BGR)
+        'cow': (0, 255, 0),         # Verde para vacas (BGR)
+        # Otros
+        'person': (255, 255, 0)     # Cian para personas (BGR)
     }
-    return colors.get(class_name, (255, 255, 255))  # Blanco por defecto
+    return colors.get(class_lower, (255, 255, 255))  # Blanco por defecto
 
 def allowed_file(filename, file_type='image'):
     """Verifica si el archivo tiene una extensión permitida"""
@@ -629,6 +591,9 @@ def video_status(filename):
                 'total_frames': 0,
                 'progress_percent': 0.0,
                 'output_video_url': None,
+            'processed_video_filename': None,
+            'report_pdf_filename': None,
+            'report_pdf_url': None,
                 'error': 'Video not found in processing queue'
             }), 404
         
@@ -646,6 +611,9 @@ def video_status(filename):
             'total_frames': status['total_frames'],
             'progress_percent': progress_percent,  # ← AGREGAR ESTE CAMPO
             'output_video_url': status.get('output_video_url'),
+            'processed_video_filename': status.get('processed_video_filename'),
+            'report_pdf_filename': status.get('report_pdf_filename'),
+            'report_pdf_url': status.get('report_pdf_url'),
             'error': status.get('error')
         })
     except Exception as e:
@@ -716,8 +684,8 @@ def detect_objects():
         # Crear copia para procesar
         processed_image = image.copy()
         
-        # Predicción del ensemble
-        detections = ensemble_predict(image, app.config['CONFIDENCE_THRESHOLD'])
+        # Predicción con modelo (imagen estática con TTA)
+        detections = ensemble_predict(image, Config.IMAGE_CONFIDENCE_THRESHOLD, use_tta=Config.IMAGE_USE_TTA)
         
         if detections is None:
             return jsonify({'error': 'Prediction failed'}), 500
@@ -852,14 +820,26 @@ def process_video():
                     'processed_frames': 0,
                     'total_frames': total_frames,
                     'output_video_url': None,
-                    'error': None
+                    'processed_video_filename': None,
+                    'error': None,
+                    'report_pdf_filename': None,
+                    'report_pdf_url': None
                 }
                 save_video_status()  # Persistir estado
                 
                 output_filename = f"processed_{name_without_ext}.mp4"
                 output_filepath = os.path.join(output_path, output_filename)
+
+                report_builder = VideoReportBuilder(
+                    video_filename=filename,
+                    fps=fps,
+                    total_frames=total_frames
+                )
                 
-                print(f"   - Modelo: Único optimizado (no ensemble)")
+                if enhanced_handler and enhanced_handler.is_trained_model:
+                    print(f"   - Modelo: bestnov.pt (entrenado)")
+                else:
+                    print(f"   - Modelo: yolov8n.pt (COCO specialized)")
                 print(f"   - Tracking: ByteTrack nativo de YOLO")
                 print(f"📁 Video de salida: {output_filepath}")
                 
@@ -885,12 +865,18 @@ def process_video():
                 
                 for result in enhanced_handler.process_video_with_tracking(
                     video_source=filepath,
-                    confidence_threshold=app.config['CONFIDENCE_THRESHOLD'],
+                    confidence_threshold=None,  # Usará Config.STREAMING_CONFIDENCE_THRESHOLD automáticamente
                     callback=update_progress
                 ):
                     processed_frame = result['frame']
                     detections = result['detections']
                     
+                    # Acumular datos de detecciones para reporte
+                    try:
+                        report_builder.add_frame_detections(result['frame_number'], detections or [])
+                    except Exception as report_error:
+                        print(f"⚠️  Error acumulando datos para el reporte: {report_error}")
+
                     # Inicializar VideoWriter con las dimensiones del primer frame
                     if out is None:
                         h, w = processed_frame.shape[:2]
@@ -910,6 +896,16 @@ def process_video():
                     out.release()
                 
                 print(f"✅ Procesamiento con tracking completado: {frame_count} frames procesados")
+
+                # Generar reporte en PDF
+                report_pdf_path = None
+                try:
+                    report_builder.set_processed_frames(frame_count)
+                    report_pdf_path = report_builder.generate_pdf(output_path)
+                    print(f"📝 Reporte generado: {report_pdf_path}")
+                except Exception as report_generation_error:
+                    report_pdf_path = None
+                    print(f"⚠️  Error generando el reporte PDF: {report_generation_error}")
                 
                 # Verificar que el archivo se creó correctamente
                 if os.path.exists(output_filepath):
@@ -943,6 +939,11 @@ def process_video():
                 if filename in video_processing_status:
                     video_processing_status[filename]['status'] = 'completed'
                     video_processing_status[filename]['output_video_url'] = f"/video/{output_filename}"
+                    video_processing_status[filename]['processed_video_filename'] = output_filename
+                    if report_pdf_path and report_pdf_path.exists():
+                        pdf_name = report_pdf_path.name
+                        video_processing_status[filename]['report_pdf_filename'] = pdf_name
+                        video_processing_status[filename]['report_pdf_url'] = f"/download/{pdf_name}"
                     save_video_status()  # Persistir estado final
                     print(f"Procesamiento completado para: {filename}")
                 
@@ -1075,9 +1076,10 @@ def webcam_stream():
         try:
             # 2. Iniciar el generador de tracking persistente con webcam
             #    source=0 usa la webcam por defecto
+            #    Usar threshold de configuración (None = usar Config.STREAMING_CONFIDENCE_THRESHOLD)
             frame_generator = enhanced_handler.process_video_with_tracking(
                 video_source=0,
-                confidence_threshold=0.4  # Threshold optimizado para tiempo real
+                confidence_threshold=None  # Usará Config.STREAMING_CONFIDENCE_THRESHOLD automáticamente
             )
             
             # 3. Iterar sobre los resultados del tracking
@@ -1176,7 +1178,7 @@ def get_webcam_performance():
             'compression_quality': 85,
             'frame_skip_ratio': 'None - Procesa todos los frames',
             'tracking_ids': 'Persistentes con ByteTrack',
-            'model_used': 'animals_best.pt (4 clases: car, cow, dog, horse)'
+            'model_used': 'bestnov.pt (entrenado)' if (enhanced_handler and enhanced_handler.is_trained_model) else 'yolov8n.pt (COCO specialized: car(2), cow(19), horse(17), dog(16))'
         }
         
         return jsonify(performance_info)
@@ -1247,8 +1249,9 @@ def webcam_detect():
         # MEJORAR CALIDAD DE IMAGEN ANTES DE DETECCIÓN
         image = enhance_frame_quality(image)
         
-        # Aplicar detección con el modelo CUDA YOLOv8m con threshold ultra-sensible
-        detections = ensemble_predict(image, 0.3)  # Threshold más sensible para HD
+        # Aplicar detección con modelo (imagen estática)
+        # NOTA: Para webcam POST, usamos configuración de imagen estática
+        detections = ensemble_predict(image, Config.IMAGE_CONFIDENCE_THRESHOLD, use_tta=False)
         
         if detections is None:
             return jsonify({'error': 'Prediction failed'}), 500

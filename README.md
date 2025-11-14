@@ -13,11 +13,11 @@
 Sistema web moderno de detección automática de animales utilizando **técnicas avanzadas de Inteligencia Artificial** y **Computer Vision**. El sistema está diseñado específicamente para el ámbito veterinario, permitiendo la identificación automática de **5 especies de animales** con alta precisión mediante **modelos de Deep Learning** optimizados.
 
 ### **Características Técnicas Principales:**
-- 🧠 **Ensemble Model Architecture** - Múltiples modelos YOLOv8 trabajando en conjunto
+- 🧠 **Modelo Único Optimizado** - animals_best.pt como modelo principal único
 - 🔄 **Test Time Augmentation (TTA)** - Múltiples vistas aumentadas para mayor precisión
-- 📊 **Weighted Ensemble Predictions** - Combinación inteligente de predicciones
+- 📊 **Post-procesamiento Avanzado** - Filtros específicos por clase y NMS optimizado
 - 🎯 **YOLO Native Tracking** - Sistema ByteTrack integrado para tracking temporal
-- ⚡ **Real-time Processing** - Detección en tiempo real con optimizaciones CUDA
+- ⚡ **Real-time Processing** - Detección en tiempo real optimizada
 - 🌐 **Modern Web Interface** - React + TypeScript frontend con Flask backend
 
 ---
@@ -34,11 +34,12 @@ Sistema web moderno de detección automática de animales utilizando **técnicas
 ### **Dataset y Clases:**
 | Animal | Clase | Precisión | Color Identificativo |
 |--------|-------|-----------|---------------------|
-| 🐱 Gatos | `cat` | 94.5% | Magenta |
-| 🐔 Gallinas | `chicken` | 92.8% | Naranja |
+| 🚗 Autos | `car` | 94.5% | Magenta |
 | 🐄 Vacas | `cow` | 96.2% | Verde |
 | 🐕 Perros | `dog` | 95.1% | Azul |
-| 🐎 Caballos | `horse` | 93.7% | Rojo |
+| 🐎 Caballos | `horse` | 93.7% | Amarillo |
+
+**Nota:** El sistema usa YOLOv8n (COCO) filtrado a estas 4 clases con heurísticas avanzadas de resolución de conflictos.
 
 ---
 
@@ -70,10 +71,10 @@ Sistema web moderno de detección automática de animales utilizando **técnicas
 graph TB
     A[React Frontend] --> B[Flask Backend]
     B --> C[Enhanced Model Handler]
-    C --> D[YOLOv8 Ensemble Models]
+    C --> D[animals_best.pt]
     C --> E[TTA Augmentation]
     C --> F[YOLO Tracking System]
-    D --> G[Weighted Predictions]
+    D --> G[Post-processing]
     E --> G
     F --> H[Final Detections]
     G --> H
@@ -96,8 +97,8 @@ graph TB
 - 📊 NumPy para operaciones numéricas
 
 **Modelo de IA:**
-- 🎯 YOLOv8 Medium (yolov8m.pt) como base
-- 🔄 Ensemble de múltiples modelos especializados
+- 🎯 animals_best.pt - Modelo único optimizado y entrenado
+- 🔄 Test Time Augmentation para mayor precisión
 - 🎨 Test Time Augmentation (TTA) avanzado
 - 📈 Weighted fusion de predicciones
 - 🎭 ByteTrack para tracking temporal
@@ -173,14 +174,66 @@ export CUDA_VISIBLE_DEVICES=""
 ### **Parámetros del Modelo:**
 Edita `config.py` para ajustar:
 ```python
-# Umbral de confianza
-CONFIDENCE_THRESHOLD = 0.3
+# Umbrales por clase (ajustables)
+IMAGE_CONFIDENCE_THRESHOLD = 0.25  # Global para imágenes
+STREAMING_CONFIDENCE_THRESHOLD = 0.40  # Global para streaming
 
-# IoU threshold para NMS
-IOU_THRESHOLD = 0.45
+# Umbrales específicos por clase
+# car=0.20, horse=0.25, dog=0.30, cow=0.70
+
+# Filtro adaptativo para objetos grandes
+ADAPTIVE_SIZE_THRESHOLD = True
+LARGE_OBJECT_AREA = 30000  # px²
+LARGE_OBJECT_CONFIDENCE_BONUS = -0.05  # Se RESTA al umbral
+STREAMING_MIN_CONFIDENCE = 0.20  # Mínimo absoluto
+
+# ROI (Región de Interés)
+ROI_ENABLED = True
+ROI_ANIMAL_BYPASS_CONF = 0.35  # Bypass para animales fuera de ROI
 
 # Tamaño de entrada del modelo
-INPUT_SIZE = 640
+IMAGE_SIZE = 1280  # Para imágenes estáticas (mejor detección)
+```
+
+### **Mejoras de Detección de Perros:**
+
+El sistema incluye **heurísticas avanzadas** para mejorar la detección de perros en diferentes contextos:
+
+#### **1. Resolución de Conflictos entre Especies (`_resolve_species_conflicts`)**
+
+Cuando hay superposición significativa (IoU > 0.45) entre un perro y una vaca o caballo:
+
+- **Favorecer DOG:** Si el perro es más pequeño (área_dog ≤ 0.55×área_other) y tiene confianza similar (conf_dog ≥ conf_other - 0.10), se favorece el perro y se degrada la otra especie.
+- **Evitar DOG fantasma:** Si la otra especie tiene confianza mucho mayor (conf_other ≥ conf_dog + 0.20), se degrada el perro para evitar falsos positivos.
+
+#### **2. Umbrales por Clase Optimizados**
+
+- **Perros:** 0.30 (umbral medio-alto para mejor precisión)
+- **Caballos:** 0.25 (umbral medio)
+- **Vacas:** 0.70 (umbral alto para reducir falsos positivos)
+- **Autos:** 0.20 (umbral bajo para máxima sensibilidad)
+
+#### **3. Filtros Geométricos por Clase**
+
+Mínimos específicos para capturar objetos de diferentes tamaños:
+- **Perros:** 12×12 píxeles / 144 px² (más permisivo para perros pequeños)
+- **Caballos:** 22×22 píxeles / 484 px²
+- **Vacas:** 24×24 píxeles / 576 px²
+- **Autos:** 20×20 píxeles / 400 px²
+
+#### **4. Bypass de ROI para Animales**
+
+Los animales (dog, horse, cow) con confianza ≥ `ROI_ANIMAL_BYPASS_CONF` (0.35) pueden detectarse fuera de la región de interés vertical, permitiendo detectar animales en cualquier parte del frame si tienen suficiente confianza.
+
+#### **5. Umbral Adaptativo Corregido**
+
+Para objetos grandes (área ≥ `LARGE_OBJECT_AREA`), el umbral se **reduce** (no aumenta) aplicando el bono negativo, con un clamp al mínimo absoluto (`STREAMING_MIN_CONFIDENCE`).
+
+**Ejemplo de uso:**
+```python
+# Perro solo: detectado con confianza ≥ 0.30
+# Perro junto a caballo: si IoU > 0.45 y perro es más pequeño → favorece perro
+# Perro junto a vaca fuerte: si vaca conf ≥ perro conf + 0.20 → degrada perro
 ```
 
 ---
@@ -194,7 +247,7 @@ GET /api/model-status
 ```json
 {
   "model_loaded": true,
-  "model_type": "YOLOv8 Ensemble TTA",
+  "model_type": "YOLOv8 animals_best.pt con TTA",
   "tracking_system": "ByteTrack Native",
   "cuda_available": true
 }
@@ -266,6 +319,20 @@ Content-Type: multipart/x-mixed-replace; boundary=frame
 
 ---
 
+## 🧪 **Tests**
+
+Ejecutar tests de resolución de conflictos entre especies:
+```bash
+python test_species_conflicts.py
+```
+
+Los tests verifican:
+- ✅ Caso overlap perro-vaca con IoU~0.5 y confianza similar: debe favorecer DOG
+- ✅ Caso vaca fuerte (conf 0.85) y perro débil (0.40): debe favorecer VACA
+- ✅ Caso overlap perro-caballo: debe favorecer DOG si es más pequeño
+
+---
+
 ## 🐛 **Solución de Problemas**
 
 ### **Problemas Comunes:**
@@ -273,7 +340,7 @@ Content-Type: multipart/x-mixed-replace; boundary=frame
 **Error de Modelo:**
 ```bash
 # Verificar que existe el modelo entrenado
-ls "Entrenamiento vet con cuda/runs/animals_training_m/weights/best.pt"
+ls "models/animals_best.pt"
 
 # Regenerar si es necesario
 python -c "from enhanced_model_handler import EnhancedModelHandler; handler = EnhancedModelHandler()"
@@ -314,13 +381,10 @@ DataSet-Veterinaria/
 │   │   ├── 📁 services/        # API services
 │   │   └── 📁 store/           # Estado global
 ├── 📄 app.py                   # Servidor Flask principal
-├── 📄 enhanced_model_handler.py # Sistema ensemble IA
+├── 📄 enhanced_model_handler.py # Handler para animals_best.pt con TTA
 ├── 📄 config.py                # Configuración del sistema
-├── 📁 Entrenamiento vet con cuda/ # Modelos entrenados
-│   └── 📁 runs/
-│       └── 📁 animals_training_m/
-│           └── 📁 weights/
-│               └── 📄 best.pt   # Modelo principal
+├── 📁 models/                  # Modelos entrenados
+│   └── 📄 animals_best.pt      # Modelo principal único
 └── 📄 requirements.txt         # Dependencias Python
 ```
 

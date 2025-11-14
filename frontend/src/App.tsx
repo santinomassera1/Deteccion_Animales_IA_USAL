@@ -10,7 +10,8 @@ import {
   XMarkIcon,
   ArrowDownTrayIcon,
   PlayIcon,
-  ChartBarIcon
+  ChartBarIcon,
+  DocumentTextIcon
 } from '@heroicons/react/24/outline';
 import WebcamDetection from './components/WebcamDetection';
 import Header from './components/Header';
@@ -89,7 +90,10 @@ const useAppState = () => {
     total_frames: 0,
     progress_percent: 0,
     error: '',
-    output_video_url: null as string | null
+    output_video_url: null as string | null,
+    processed_video_filename: null as string | null,
+    report_pdf_filename: null as string | null,
+    report_pdf_url: null as string | null
   });
   const [uploadedVideo, setUploadedVideo] = useState<File | null>(null);
   const [uploadedVideoFilename, setUploadedVideoFilename] = useState<string | null>(null);
@@ -245,7 +249,10 @@ const useAppState = () => {
         total_frames: 0, 
         progress_percent: 0, 
         error: '', 
-        output_video_url: null 
+        output_video_url: null,
+        processed_video_filename: null,
+        report_pdf_filename: null,
+        report_pdf_url: null
       });
       
       console.log('🚀 Enviando archivo al servidor...');
@@ -294,7 +301,10 @@ const useAppState = () => {
       total_frames: 0, 
       progress_percent: 0, 
       error: '', 
-      output_video_url: null 
+      output_video_url: null,
+      processed_video_filename: null,
+      report_pdf_filename: null,
+      report_pdf_url: null
     });
     setUploadedVideo(null);
     setUploadedVideoFilename(null);
@@ -911,14 +921,30 @@ const VideoDetection = ({
                 
                 {/* Botones de acción */}
                 <div className="flex space-x-4 mt-4">
-                    <a
+                  <a
                     href={`http://localhost:5003${videoStatus.output_video_url}`}
-                      download
+                    download
                     className="inline-flex items-center px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-medium rounded-lg transition-colors duration-200"
                   >
                     <ArrowDownTrayIcon className="w-4 h-4 mr-2" />
                     Descargar Video
                   </a>
+                  {(() => {
+                    const pdfPath = videoStatus.report_pdf_url || (videoStatus.report_pdf_filename ? `/download/${videoStatus.report_pdf_filename}` : null);
+                    if (!pdfPath) {
+                      return null;
+                    }
+                    return (
+                      <a
+                        href={`http://localhost:5003${pdfPath}`}
+                        download={videoStatus.report_pdf_filename || undefined}
+                        className="inline-flex items-center px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white font-medium rounded-lg transition-colors duration-200"
+                      >
+                        <DocumentTextIcon className="w-4 h-4 mr-2" />
+                        Reporte PDF
+                      </a>
+                    );
+                  })()}
                   <button
                     onClick={() => {
                       const video = document.querySelector('video');
@@ -935,7 +961,7 @@ const VideoDetection = ({
                     </svg>
                     Pantalla Completa
                   </button>
-                  </div>
+                </div>
                 </div>
               
               {/* Estadísticas del procesamiento */}

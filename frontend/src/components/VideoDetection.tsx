@@ -7,7 +7,8 @@ import {
   XMarkIcon, 
   PlayIcon,
   ArrowDownTrayIcon,
-  ChartBarIcon
+  ChartBarIcon,
+  DocumentTextIcon
 } from '@heroicons/react/24/outline';
 import { useAppStore } from '../store/useAppStore';
 import { apiService } from '../services/api';
@@ -51,7 +52,11 @@ const VideoDetection = () => {
         progress: 0, 
         processed_frames: 0,
         total_frames: 0, 
-        progress_percent: 0 
+        progress_percent: 0,
+        output_video_url: undefined,
+        processed_video_filename: null,
+        report_pdf_filename: null,
+        report_pdf_url: null
       } as VideoStatus);
       
       // Upload file
@@ -96,7 +101,11 @@ const VideoDetection = () => {
         progress: 0, 
         processed_frames: 0,
         total_frames: 0, 
-        progress_percent: 0 
+        progress_percent: 0,
+        output_video_url: undefined,
+        processed_video_filename: null,
+        report_pdf_filename: null,
+        report_pdf_url: null
       } as VideoStatus);
       
       const uploadResult = await apiService.uploadFile(uploadedFile);
@@ -119,6 +128,10 @@ const VideoDetection = () => {
         processed_frames: 0,
         total_frames: 0, 
         progress_percent: 0,
+        output_video_url: undefined,
+        processed_video_filename: null,
+        report_pdf_filename: null,
+        report_pdf_url: null,
         error: 'Error al procesar el video'
       } as VideoStatus);
       addNotification({
@@ -167,6 +180,10 @@ const VideoDetection = () => {
           processed_frames: 0,
           total_frames: 0,
           progress_percent: 0,
+          output_video_url: undefined,
+          processed_video_filename: null,
+          report_pdf_filename: null,
+          report_pdf_url: null,
           error: 'Error de conexión durante el procesamiento'
         } as VideoStatus);
       }
@@ -180,9 +197,41 @@ const VideoDetection = () => {
       progress: 0, 
       processed_frames: 0,
       total_frames: 0, 
-      progress_percent: 0 
+      progress_percent: 0,
+      output_video_url: undefined,
+      processed_video_filename: null,
+      report_pdf_filename: null,
+      report_pdf_url: null
     } as VideoStatus);
   };
+
+  const reportFilename = videoStatus.report_pdf_filename || undefined;
+  const reportUrlFromStatus = videoStatus.report_pdf_url || undefined;
+  const reportDownloadUrl = reportUrlFromStatus
+    ? apiService.resolveUrl(reportUrlFromStatus)
+    : reportFilename
+    ? apiService.getDownloadUrl(reportFilename)
+    : undefined;
+  const hasReport = Boolean(reportDownloadUrl);
+  const completedActionsClass = `grid grid-cols-1 ${hasReport ? 'sm:grid-cols-3' : 'sm:grid-cols-2'} gap-3`;
+
+  const derivedFilenameFromUrl = videoStatus.output_video_url
+    ? videoStatus.output_video_url.split('/').filter(Boolean).pop()
+    : undefined;
+  const processedVideoFilename =
+    videoStatus.processed_video_filename ||
+    derivedFilenameFromUrl ||
+    (uploadedFile ? `processed_${uploadedFile.name}` : undefined);
+
+  const viewVideoUrl = videoStatus.output_video_url
+    ? apiService.resolveUrl(videoStatus.output_video_url)
+    : processedVideoFilename
+    ? apiService.getVideoUrl(processedVideoFilename)
+    : undefined;
+
+  const downloadVideoUrl = processedVideoFilename
+    ? apiService.getDownloadUrl(processedVideoFilename)
+    : undefined;
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -353,24 +402,34 @@ const VideoDetection = () => {
                   </p>
                 </div>
                 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className={completedActionsClass}>
                   <a
-                    href={apiService.getVideoUrl((videoStatus as any).output_video_url || `processed_${uploadedFile?.name}` || '')}
+                    href={viewVideoUrl || '#'}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="btn-primary justify-center"
+                    className={`btn-primary justify-center ${!viewVideoUrl ? 'pointer-events-none opacity-50' : ''}`}
                   >
                     <PlayIcon className="w-4 h-4 mr-2" />
                     Ver video procesado
                   </a>
                   <a
-                    href={apiService.getDownloadUrl((videoStatus as any).output_video_url || `processed_${uploadedFile?.name}` || '')}
-                    download={(videoStatus as any).output_video_url || `processed_${uploadedFile?.name}`}
-                    className="btn-secondary justify-center"
+                    href={downloadVideoUrl || '#'}
+                    download={processedVideoFilename || undefined}
+                    className={`btn-secondary justify-center ${!downloadVideoUrl ? 'pointer-events-none opacity-50' : ''}`}
                   >
                     <ArrowDownTrayIcon className="w-4 h-4 mr-2" />
                     Descargar
                   </a>
+                  {hasReport && reportDownloadUrl && (
+                    <a
+                      href={reportDownloadUrl}
+                      download={reportFilename || undefined}
+                      className="btn-secondary justify-center"
+                    >
+                      <DocumentTextIcon className="w-4 h-4 mr-2" />
+                      Reporte PDF
+                    </a>
+                  )}
                 </div>
                 
                 {videoStatus.progress && videoStatus.total_frames && (

@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_BASE_URL = 'http://localhost:5003';
+export const API_BASE_URL = 'http://localhost:5003';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -72,6 +72,9 @@ export interface VideoStatus {
   progress_percent: number;
   progress: number; 
   output_video_url?: string;
+  processed_video_filename?: string | null;
+  report_pdf_filename?: string | null;
+  report_pdf_url?: string | null;
   error?: string;
   filename?: string;
 }
@@ -169,6 +172,13 @@ export const apiService = {
   // Video stream
   getVideoUrl(filename: string): string {
     return `${API_BASE_URL}/video/${filename}`;
+  },
+
+  // Utilidad para paths relativos devueltos por el backend
+  resolveUrl(path: string): string {
+    if (!path) return API_BASE_URL;
+    if (path.startsWith('http://') || path.startsWith('https://')) return path;
+    return `${API_BASE_URL}${path.startsWith('/') ? path : `/${path}`}`;
   },
 };
 

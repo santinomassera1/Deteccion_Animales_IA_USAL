@@ -19,9 +19,15 @@ export interface DetectionResult {
 export interface VideoStatus {
   status: 'processing' | 'completed' | 'error' | 'idle';
   progress: number;
+  processed_frames: number;
   total_frames: number;
   progress_percent: number;
+  output_video_url?: string;
+  processed_video_filename?: string | null;
+  report_pdf_filename?: string | null;
+  report_pdf_url?: string | null;
   error?: string;
+  filename?: string;
 }
 
 interface AppState {
@@ -74,8 +80,13 @@ export const useAppStore = create<AppState>((set, get) => ({
   videoStatus: {
     status: 'idle',
     progress: 0,
+    processed_frames: 0,
     total_frames: 0,
     progress_percent: 0,
+    output_video_url: undefined,
+    processed_video_filename: null,
+    report_pdf_filename: null,
+    report_pdf_url: null,
   },
   setVideoStatus: (status) => set({ videoStatus: status }),
   
